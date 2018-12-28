@@ -1262,8 +1262,22 @@ void CopyFromTo(const NDArray& from, const NDArray& to, int priority, bool is_op
         }, from.ctx(), const_vars, mutable_vars,
         from.dtype() != to.dtype() ? FnProperty::kNormal : FnProperty::kCopyFromGPU,
         priority, is_opr ? "_copyto_GPU2GPU" : "CopyGPU2GPU");
+    } else if (a == cpu::kDevMask && to.ctx().isAcc()) {
+      Engine::Get()->PushAsync(
+        [from, to, requested](RunContext ctx, Engine::CallbackOnComplete on_complete) {
+          CopyFromToImpl<cpu, mshadow::acc>(from, to, ctx, requested);
+          on_complete();
+        }, to.ctx(), const_vars, mutable_vars,
+        FnProperty::kCopyToAcc, priority, "CopyCPU2Acc");
+    } else if (from.ctx().isAcc() && b == cpu::kDevMask) {
+      Engine::Get()->PushAsync(
+        [from, to, requested](RunContext ctx, Engine::CallbackOnComplete on_complete) {
+          CopyFromToImpl<mshadow::acc, cpu>(from, to, ctx, requested);
+          on_complete();
+        }, from.ctx(), const_vars, mutable_vars,
+        FnProperty::kCopyFromGPU, priority, "CopyAcc2CPU");
     } else {
-      LOG(FATAL) << "unknown device mask";
+      LOG(FATAL) << "Cannot copy from " << from.ctx() << " to " << to.ctx();
     }
 #else
     LOG(FATAL) << MXNET_GPU_NOT_ENABLED_ERROR;

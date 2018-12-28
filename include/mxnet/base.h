@@ -36,6 +36,9 @@
 #include <nnvm/symbolic.h>
 #include <string>
 
+#include "library.h"
+#include "mxnet_acc.h"
+
 /*!
  *\brief whether to use opencv support
  */
@@ -114,6 +117,16 @@
  */
 #define PROFILER_MESSAGE_FUNCNAME (__FUNCTION__)
 
+namespace mshadow {
+    /*! \brief device name ACC */
+    struct acc {
+      /*! \brief whether this device is CPU or not */
+      static const bool kDevCPU = false;
+      /*! \brief device flag number, identifies this device */
+      static const int kDevMask = 1 << 2;
+    };
+}
+
 /*! \brief namespace of mxnet */
 namespace mxnet {
 /*! \brief mxnet cpu */
@@ -129,15 +142,39 @@ using TShape = nnvm::TShape;
 /*! \brief operator structure from NNVM */
 using Op = nnvm::Op;
 
+ struct AccContext {
+   int kAccType;
+   std::string accName;
+   void** (*getFCompute)(std::string);
+   
+   /*! \brief default constructor */
+ AccContext() : kAccType(0), accName("Error") {}
+   /*! \brief constructor */
+ AccContext(int type, std::string name) : kAccType(type), accName(name) {}
+ };
+ 
 /*! \brief Context information about the execution environment */
 struct Context {
+  static const int kCPU = 1;
+  static const int kGPU = 2;
+  static const int kCPUPinned = 3;
+  static const int kCPUShared = 5;
+  static const int kAccBase = 10;
+  
+  typedef int DeviceType;
+
+  static std::map<int,AccContext> acc_map;
+  static std::map<std::string,int> acc_names;
+  
   /*! \brief Type of device */
+  /*
   enum DeviceType {
     kCPU = cpu::kDevMask,
     kGPU = gpu::kDevMask,
     kCPUPinned = 3,
     kCPUShared = 5,
   };
+  */
   /*! \brief the device type we run the op on */
   DeviceType dev_type;
   /*! \brief device id we are going to run it on */
@@ -157,7 +194,11 @@ struct Context {
    */
   inline int real_dev_id() const {
     if (dev_type == kCPUPinned || dev_type == kGPU) return dev_id;
+    else if(dev_type >= kAccBase) return dev_id;
     return 0;
+  }
+  inline bool isAcc() const {
+    return dev_type >= kAccBase;
   }
   /*!
    * \brief Comparator, used to enable Context as std::map key.
@@ -200,7 +241,7 @@ struct Context {
     return true;
   }
   /*! \brief the maximal device type */
-  static const int32_t kMaxDevType = 6;
+  static const int32_t kMaxDevType = 20;
   /*! \brief the maximal device index */
   static const int32_t kMaxDevID = 16;
   /*!
@@ -248,6 +289,12 @@ struct Context {
    * \return Context
    */
   inline static Context FromString(const std::string& str);
+  /*!
+   * Create an accelerator with name string
+   * \param name of the accelerator
+   * \return No return value
+   */
+  inline static int LoadAcc(std::string& path, char *name);
 };
 
 /*!
@@ -279,7 +326,7 @@ struct RunContext {
 
 //! \cond Doxygen_Suppress
 namespace mxnet {
-// implementing Context
+// implementing Context  
 inline bool Context::operator<(const Context &b) const {
   if (dev_type == b.dev_type) {
     return dev_id < b.dev_id;
@@ -381,6 +428,8 @@ inline Context Context::FromString(const std::string& str) {
       ret = CPUPinned(id);
     } else if (type == "cpu_shared") {
       ret = CPUShared(id);
+    } else if (Context::acc_names.find(type) != Context::acc_names.end()) {
+      ret = Create(Context::acc_names[type],id);
     } else {
       LOG(FATAL) << "Invalid context string " << str;
     }
@@ -390,6 +439,36 @@ inline Context Context::FromString(const std::string& str) {
   return ret;
 }
 
+ inline int Context::LoadAcc(std::string& path, char *name) {
+   //load library
+   void *lib = load_lib(path.c_str());
+   if(!lib)
+     return -1;
+   
+   //get name function from library
+   std::string (*getAccName)();
+   get_func(lib, (void**)(&getAccName), (char*)"getAccName");
+   if(!getAccName)
+     return -1;
+   //call name function
+   std::string name_str = getAccName();
+   strcpy(name,name_str.c_str());
+   
+   //create entry for accelerator
+   int id = Context::kAccBase + Context::acc_map.size();
+   AccContext ctx(id,name_str);
+
+   //get getFCompute function
+   get_func(lib, (void**)(&(ctx.getFCompute)), (char*)"getFCompute");
+   if(!ctx.getFCompute)
+     return -1;
+   
+   //add accelerator context to map
+   Context::acc_map[id] = ctx;
+   Context::acc_names[name_str] = id;
+   return id;
+ }
+ 
 inline std::ostream& operator<<(std::ostream &out, const Context &ctx) {
   if (ctx.dev_type == Context::kCPU) {
     out << "cpu(";
@@ -399,6 +478,8 @@ inline std::ostream& operator<<(std::ostream &out, const Context &ctx) {
     out << "cpu_pinned(";
   } else if (ctx.dev_type == Context::kCPUShared) {
     out << "cpu_shared(";
+  } else if (Context::acc_map.find(ctx.dev_type) != Context::acc_map.end()) {
+    out << Context::acc_map[ctx.dev_type].accName << "(";
   } else {
     out << "unknown(";
   }

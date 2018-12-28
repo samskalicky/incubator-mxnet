@@ -208,6 +208,8 @@ MXNET_DLL const char *MXGetLastError();
 //-------------------------------------
 // Part 0: Global State setups
 //-------------------------------------
+MXNET_DLL int MXLoadAccLib(const char *path, int *id, char *name);
+  
 /*!
  * \brief Seed all global random number generators in mxnet.
  * \param seed the random number seed.

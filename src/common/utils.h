@@ -653,6 +653,12 @@ FCompType GetFCompute(const nnvm::Op* op, const std::string& name,
     return fcompute_cpu.get(op, nullptr);
   } else if (ctx.dev_mask() == gpu::kDevMask) {
     return fcompute_gpu.get(op, nullptr);
+  } else if (Context::acc_map.find(ctx.dev_type) != Context::acc_map.end()) {
+    AccContext acc = Context::acc_map[ctx.dev_type];
+    void** fcomp = acc.getFCompute(op->name);
+    if(!fcomp)
+      LOG(FATAL) << "Unsupported FCompute for op: '" << op->name << "' on eacc: " << Context::acc_map[ctx.dev_type].accName;
+    LOG(FATAL) << "Not sure what to do here...";
   } else {
     LOG(FATAL) << "Unknown device mask";
     return nullptr;

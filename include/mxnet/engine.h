@@ -99,6 +99,10 @@ enum class FnProperty {
   kCopyFromGPU,
   /*! \brief Copy operation from CPU to other devices */
   kCopyToGPU,
+  /*! \brief Copy operation from Acc to other devices */
+  kCopyFromAcc,
+  /*! \brief Copy operation from CPU to other accelerators */
+  kCopyToAcc,
   /*! \brief Prioritized sync operation on CPU */
   kCPUPrioritized,
   /*! \brief Asynchronous function call */

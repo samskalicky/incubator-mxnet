@@ -84,6 +84,14 @@ inline int MXAPIGetFunctionRegInfo(const FunRegType *e,
   API_END();
 }
 
+int MXLoadAccLib(const char *path, int *id, char *name) {
+  API_BEGIN();
+  std::string tmp(path);
+  int dev_id = mxnet::Context::LoadAcc(tmp,name);
+  *id = dev_id;
+  API_END();
+}
+
 // NOTE: return value is added in API_END
 int MXRandomSeed(int seed) {
   API_BEGIN();
