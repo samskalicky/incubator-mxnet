@@ -88,6 +88,8 @@ int StorageImpl::num_gpu_device = 0;
 
 void StorageImpl::Alloc(Storage::Handle* handle) {
   // space already recycled, ignore request
+  if(handle->ctx.dev_type >= storage_managers_.size())
+    LOG(FATAL) << "Requesting storage manager for dev_type (" << handle->ctx.dev_type << ") but current size is " << storage_managers_.size();
   auto&& device = storage_managers_.at(handle->ctx.dev_type);
   std::shared_ptr<storage::StorageManager> manager = device.Get(
       handle->ctx.real_dev_id(), [handle]() {
@@ -162,6 +164,8 @@ void StorageImpl::Alloc(Storage::Handle* handle) {
 
 void StorageImpl::Free(Storage::Handle handle) {
   const Context &ctx = handle.ctx;
+  if(ctx.dev_type >= storage_managers_.size())
+    LOG(FATAL) << "Requesting storage manager for dev_type (" << ctx.dev_type << ") but current size is " << storage_managers_.size();
   auto&& device = storage_managers_.at(ctx.dev_type);
   std::shared_ptr<storage::StorageManager> manager = device.Get(
       ctx.real_dev_id(), []() {
@@ -181,6 +185,8 @@ void StorageImpl::Free(Storage::Handle handle) {
 
 void StorageImpl::DirectFree(Storage::Handle handle) {
   const Context &ctx = handle.ctx;
+  if(ctx.dev_type >= storage_managers_.size())
+    LOG(FATAL) << "Requesting storage manager for dev_type (" << ctx.dev_type << ") but current size is " << storage_managers_.size();
   auto&& device = storage_managers_.at(ctx.dev_type);
   std::shared_ptr<storage::StorageManager> manager = device.Get(
       ctx.real_dev_id(), []() {

@@ -1,12 +1,12 @@
-
+#include "mxnet_acc.h"
 #include <string>
+#include <cstring>
 
-typedef int (FCompute)(int, void*);
-
-std::string getAccName() {
-  return std::string("myacc");
+extern "C" void getAccName(char* s) {
+  std::string name = "myacc";
+  strcpy(s,name.c_str());
 }
 
-extern "C" FCompute* getFCompute(std::string) {
+extern "C" FCompute* getFCompute(const char* name) {
   return 0;
 }

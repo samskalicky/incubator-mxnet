@@ -692,6 +692,24 @@ struct Kernel<OP, gpu> {
 };
 #endif  // __CUDACC__
 
+ template<typename OP>
+struct Kernel<OP, acc> {
+  /*! \brief Launch Acc kernel */
+  template<typename ...Args>
+  inline static void Launch(mshadow::Stream<acc> *s, int N, Args... args) {
+    for (size_t i = 0; i < N; ++i) {
+      OP::Map(i, args...);
+    } 
+  }
+
+  template<typename ...Args>
+  inline static void LaunchEx(mshadow::Stream<acc> *s, const int N, Args... args) {
+    for (size_t i = 0; i < N; ++i) {
+      OP::Map(i, args...);
+    } 
+  }
+};
+
 /*!
  * \brief Set to immediate scalar value kernel
  * \tparam val Scalar immediate

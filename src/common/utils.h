@@ -655,7 +655,7 @@ FCompType GetFCompute(const nnvm::Op* op, const std::string& name,
     return fcompute_gpu.get(op, nullptr);
   } else if (Context::acc_map.find(ctx.dev_type) != Context::acc_map.end()) {
     AccContext acc = Context::acc_map[ctx.dev_type];
-    void** fcomp = acc.getFCompute(op->name);
+    void** fcomp = acc.getFCompute(op->name.c_str());
     if(!fcomp)
       LOG(FATAL) << "Unsupported FCompute for op: '" << op->name << "' on eacc: " << Context::acc_map[ctx.dev_type].accName;
     LOG(FATAL) << "Not sure what to do here...";

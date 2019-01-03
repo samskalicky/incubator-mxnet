@@ -145,7 +145,7 @@ using Op = nnvm::Op;
  struct AccContext {
    int kAccType;
    std::string accName;
-   void** (*getFCompute)(std::string);
+   void** (*getFCompute)(const char*);
    
    /*! \brief default constructor */
  AccContext() : kAccType(0), accName("Error") {}
@@ -443,15 +443,18 @@ inline Context Context::FromString(const std::string& str) {
    //load library
    void *lib = load_lib(path.c_str());
    if(!lib)
-     return -1;
+     LOG(FATAL) << "Unable to load library";
    
    //get name function from library
-   std::string (*getAccName)();
+   void (*getAccName)(char*);
    get_func(lib, (void**)(&getAccName), (char*)"getAccName");
    if(!getAccName)
-     return -1;
+     LOG(FATAL) << "Unable to get accelerator name from library";
+
    //call name function
-   std::string name_str = getAccName();
+   char accname[100];
+   getAccName(accname);
+   std::string name_str(accname);
    strcpy(name,name_str.c_str());
    
    //create entry for accelerator
@@ -461,7 +464,7 @@ inline Context Context::FromString(const std::string& str) {
    //get getFCompute function
    get_func(lib, (void**)(&(ctx.getFCompute)), (char*)"getFCompute");
    if(!ctx.getFCompute)
-     return -1;
+     LOG(FATAL) << "Unable to get getFCompute function from library";
    
    //add accelerator context to map
    Context::acc_map[id] = ctx;
