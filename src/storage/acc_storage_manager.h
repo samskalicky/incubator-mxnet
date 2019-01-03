@@ -46,7 +46,7 @@ class AccStorageManager final : public StorageManager {
   /*!
    * \brief Default constructor.
    */
- AccStorageManager(Context& context) : ctx(context) {}
+ AccStorageManager(Context& context) : ctx(context), accel(context.getAccel()) {}
 
   /*!
    * \brief Default destructor.
@@ -61,23 +61,29 @@ class AccStorageManager final : public StorageManager {
   
  private:
   Context ctx;
+  AccContext accel;
   void ReleaseAll();
 };  // class AccStorageManager
 
 void AccStorageManager::Alloc(Storage::Handle* handle) {
-  LOG(FATAL) << "Unimplemented alloc for device " << handle->ctx;
+  std::cout << "Acc alloc" << std::endl;
+  std::cout << (void*)(accel.alloc) << std::endl;
+  handle->dptr = accel.alloc(handle->size);
+  if(handle->dptr == 0)
+    LOG(FATAL) << "Error! Accelerator " << ctx << " alloc returned 0";
 }
 
 void AccStorageManager::Free(Storage::Handle handle) {
-  LOG(FATAL) << "Unimplemented free for device " << handle.ctx;
+  accel.free(handle.dptr);
 }
 
 void AccStorageManager::DirectFree(Storage::Handle handle) {
-  LOG(FATAL) << "Unimplemented directfree for device " << handle.ctx;
+  accel.directFree(handle.dptr);
 }
  
 void AccStorageManager::ReleaseAll() {
-  LOG(FATAL) << "Unimplemented releaseAll for device " << ctx;
+  std::cout << "Acc releaseAll" << std::endl;
+  accel.releaseAll();
 }
 
 }  // namespace storage

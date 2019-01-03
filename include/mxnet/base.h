@@ -146,7 +146,11 @@ using Op = nnvm::Op;
    int kAccType;
    std::string accName;
    void** (*getFCompute)(const char*);
-   
+   void (*releaseAll)();
+   void (*free)(void*);
+   void (*directFree)(void*);
+   void* (*alloc)(size_t size);
+         
    /*! \brief default constructor */
  AccContext() : kAccType(0), accName("Error") {}
    /*! \brief constructor */
@@ -162,7 +166,7 @@ struct Context {
   static const int kAccBase = 10;
   
   typedef int DeviceType;
-
+  
   static std::map<int,AccContext> acc_map;
   static std::map<std::string,int> acc_names;
   
@@ -199,6 +203,9 @@ struct Context {
   }
   inline bool isAcc() const {
     return dev_type >= kAccBase;
+  }
+  inline AccContext getAccel() const {
+    return acc_map[dev_type];
   }
   /*!
    * \brief Comparator, used to enable Context as std::map key.
@@ -429,7 +436,8 @@ inline Context Context::FromString(const std::string& str) {
     } else if (type == "cpu_shared") {
       ret = CPUShared(id);
     } else if (Context::acc_names.find(type) != Context::acc_names.end()) {
-      ret = Create(Context::acc_names[type],id);
+      int dev_type = Context::acc_names[type];
+      ret = Create(dev_type,id);
     } else {
       LOG(FATAL) << "Invalid context string " << str;
     }
@@ -465,6 +473,22 @@ inline Context Context::FromString(const std::string& str) {
    get_func(lib, (void**)(&(ctx.getFCompute)), (char*)"getFCompute");
    if(!ctx.getFCompute)
      LOG(FATAL) << "Unable to get getFCompute function from library";
+
+   get_func(lib, (void**)(&(ctx.releaseAll)), (char*)"releaseAll");
+   if(!ctx.releaseAll)
+     LOG(FATAL) << "Unable to get releaseAll function from library";
+
+   get_func(lib, (void**)(&(ctx.free)), (char*)"free");
+   if(!ctx.getFCompute)
+     LOG(FATAL) << "Unable to get free function from library";
+
+   get_func(lib, (void**)(&(ctx.directFree)), (char*)"directFree");
+   if(!ctx.getFCompute)
+     LOG(FATAL) << "Unable to get directFree function from library";
+
+   get_func(lib, (void**)(&(ctx.alloc)), (char*)"alloc");
+   if(!ctx.getFCompute)
+     LOG(FATAL) << "Unable to get alloc function from library";
    
    //add accelerator context to map
    Context::acc_map[id] = ctx;
