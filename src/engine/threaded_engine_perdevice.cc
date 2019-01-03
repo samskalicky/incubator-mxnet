@@ -195,7 +195,7 @@ class ThreadedEnginePerDevice : public ThreadedEngine {
           }
         }
       } else if(ctx.isAcc()) {
-
+        LOG(FATAL) << "Unimplemented for accelerator " << ctx;
       } else {
         LOG(FATAL) << "Unimplemented for device " << ctx;
       }
