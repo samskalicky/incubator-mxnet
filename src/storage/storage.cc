@@ -29,6 +29,7 @@
 #include "./pinned_memory_storage.h"
 #include "../common/lazy_alloc_array.h"
 #include "../profiler/storage_profiler.h"
+#include "./acc_storage_manager.h"
 
 namespace mxnet {
 
@@ -49,6 +50,10 @@ class StorageImpl : public Storage {
 #endif  // MXNET_USE_CUDA
 
   static void ActivateDevice(Context ctx) {
+    if(ctx.isAcc()) {
+      return;
+    }
+    
     switch (ctx.dev_type) {
       case Context::kCPU:
         break;
@@ -94,6 +99,12 @@ void StorageImpl::Alloc(Storage::Handle* handle) {
   std::shared_ptr<storage::StorageManager> manager = device.Get(
       handle->ctx.real_dev_id(), [handle]() {
         storage::StorageManager *ptr = nullptr;
+
+        if(handle->ctx.isAcc()) {
+          ptr = new storage::AccStorageManager(handle->ctx);
+          return ptr;
+        }
+        
         switch (handle->ctx.dev_type) {
           case Context::kCPU: {
             ptr = new storage::NaiveStorageManager<storage::CPUDeviceStorage>();

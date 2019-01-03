@@ -51,5 +51,12 @@ void CastStorageDispatch<cpu>(const OpContext& ctx,
   mxnet::op::CastStorageComputeImpl<cpu>(ctx, input, output);
 }
 
+template<>
+void CastStorageDispatch<mshadow::acc>(const OpContext& ctx,
+                              const NDArray& input,
+                              const NDArray& output) {
+  LOG(FATAL) << "unimplemented cast for accelerator";
+}
+
 }  // namespace common
 }  // namespace mxnet

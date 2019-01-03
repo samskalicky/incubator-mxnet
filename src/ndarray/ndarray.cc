@@ -1235,7 +1235,7 @@ void CopyFromTo(const NDArray& from, const NDArray& to, int priority, bool is_op
         on_complete();
       }, from.ctx(), const_vars, mutable_vars,
       FnProperty::kNormal, priority, "CopyCPU2CPU");
-  } else {
+  } else if(a == gpu::kDevMask || b == gpu::kDevMask) {
 #if MXNET_USE_CUDA
     if (a == cpu::kDevMask && b == gpu::kDevMask) {
       Engine::Get()->PushAsync(
@@ -1262,7 +1262,13 @@ void CopyFromTo(const NDArray& from, const NDArray& to, int priority, bool is_op
         }, from.ctx(), const_vars, mutable_vars,
         from.dtype() != to.dtype() ? FnProperty::kNormal : FnProperty::kCopyFromGPU,
         priority, is_opr ? "_copyto_GPU2GPU" : "CopyGPU2GPU");
-    } else if (a == cpu::kDevMask && to.ctx().isAcc()) {
+    } else {
+      LOG(FATAL) << "Cannot copy from " << from.ctx() << " to " << to.ctx();
+    }
+#else
+    LOG(FATAL) << MXNET_GPU_NOT_ENABLED_ERROR;
+#endif
+  } else if (a == cpu::kDevMask && to.ctx().isAcc()) {
       Engine::Get()->PushAsync(
         [from, to, requested](RunContext ctx, Engine::CallbackOnComplete on_complete) {
           CopyFromToImpl<cpu, mshadow::acc>(from, to, ctx, requested);
@@ -1275,13 +1281,17 @@ void CopyFromTo(const NDArray& from, const NDArray& to, int priority, bool is_op
           CopyFromToImpl<mshadow::acc, cpu>(from, to, ctx, requested);
           on_complete();
         }, from.ctx(), const_vars, mutable_vars,
-        FnProperty::kCopyFromGPU, priority, "CopyAcc2CPU");
-    } else {
-      LOG(FATAL) << "Cannot copy from " << from.ctx() << " to " << to.ctx();
-    }
-#else
-    LOG(FATAL) << MXNET_GPU_NOT_ENABLED_ERROR;
-#endif
+        FnProperty::kCopyFromAcc, priority, "CopyAcc2CPU");
+  } else if (from.ctx().isAcc() && to.ctx().isAcc()) {
+      Engine::Get()->PushAsync(
+        [from, to, requested](RunContext ctx, Engine::CallbackOnComplete on_complete) {
+          CopyFromToImpl<mshadow::acc, mshadow::acc>(from, to, ctx, requested);
+          on_complete();
+        }, from.ctx(), const_vars, mutable_vars,
+        from.dtype() != to.dtype() ? FnProperty::kNormal : FnProperty::kCopyFromAcc,
+        priority, is_opr ? "_copyto_Acc2Acc" : "CopyAcc2Acc");
+  } else {
+    LOG(FATAL) << "Cannot copy from " << from.ctx() << " to " << to.ctx();
   }
 }
 
@@ -1976,7 +1986,7 @@ void NDArray::SyncCopyToCPU(void *data, size_t size) const {
 #endif
     ndarray::Copy<cpu, cpu>(src.data(), &dst,
                             Context::CPU(), Context::CPU(), rctx);
-  } else {
+  } else if(this->ctx().dev_mask() == gpu::kDevMask) {
 #if MXNET_USE_CUDA
     Engine::Get()->PushAsync(
       [&](RunContext rctx, Engine::CallbackOnComplete on_complete) {
@@ -1991,8 +2001,19 @@ void NDArray::SyncCopyToCPU(void *data, size_t size) const {
 #else
     LOG(FATAL) << "GPU is not enabled";
 #endif
+  } else if(this->ctx().isAcc()) {
+      Engine::Get()->PushAsync(
+      [&](RunContext rctx, Engine::CallbackOnComplete on_complete) {
+      ndarray::Copy<mshadow::acc, cpu>(this->data(), &dst,
+                                this->ctx(), Context::CPU(), rctx);
+        on_complete();
+      }, this->ctx(), {this->var()}, {},
+      FnProperty::kCopyFromAcc, 0, "SyncCopyAcc2CPU");
+      this->WaitToWrite();
+  } else {
+    LOG(FATAL) << "Unimplemented copy for device " << this->ctx();
   }
-}
+}   
 
 void NDArray::SyncCheckFormat(const bool full_check) const {
   int32_t err = kNormalErr;

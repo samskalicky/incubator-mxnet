@@ -51,6 +51,27 @@ void Copy<cpu, cpu>(const TBlob &from, TBlob *to,
   })
 }
 
+  template<>
+  void Copy<cpu, mshadow::acc>(const TBlob &from, TBlob *to,
+                    Context from_ctx, Context to_ctx,
+                    RunContext ctx) {
+    LOG(FATAL) << "Unimplemented copy to acc";
+}
+
+  template<>
+  void Copy<mshadow::acc, cpu>(const TBlob &from, TBlob *to,
+                    Context from_ctx, Context to_ctx,
+                    RunContext ctx) {
+    LOG(FATAL) << "Unimplemented copy from acc";
+}
+
+  template<>
+  void Copy<mshadow::acc, mshadow::acc>(const TBlob &from, TBlob *to,
+                    Context from_ctx, Context to_ctx,
+                    RunContext ctx) {
+    LOG(FATAL) << "Unimplemented copy within acc";
+}
+
 template<typename DType, typename IType>
 void ElementwiseSumRspImpl(mshadow::Stream<cpu>* s,
                            const std::vector<NDArray>& nds,

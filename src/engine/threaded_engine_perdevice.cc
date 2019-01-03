@@ -125,7 +125,7 @@ class ThreadedEnginePerDevice : public ThreadedEngine {
             }
           }
         }
-      } else {
+      } else if(ctx.dev_mask() == Context::kGPU) {
         CHECK_EQ(ctx.dev_mask(), Context::kGPU);
         // GPU execution.
         const FnProperty prop = opr_block->opr->prop;
@@ -194,6 +194,10 @@ class ThreadedEnginePerDevice : public ThreadedEngine {
             }
           }
         }
+      } else if(ctx.isAcc()) {
+
+      } else {
+        LOG(FATAL) << "Unimplemented for device " << ctx;
       }
     }
   }
