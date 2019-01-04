@@ -11,3 +11,4 @@ extern "C" void* alloc(std::size_t size);
 
 extern "C" int copyTo(void* dst, void* src, size_t size);
 extern "C" int copyFrom(void* dst, void* src, size_t size);
+extern "C" int copyBetween(void* dst, void* src, size_t size);
