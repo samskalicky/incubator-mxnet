@@ -51,25 +51,40 @@ void Copy<cpu, cpu>(const TBlob &from, TBlob *to,
   })
 }
 
-  template<>
-  void Copy<cpu, mshadow::acc>(const TBlob &from, TBlob *to,
+template<>
+void Copy<cpu, mshadow::acc>(const TBlob &from, TBlob *to,
                     Context from_ctx, Context to_ctx,
                     RunContext ctx) {
-    LOG(FATAL) << "Unimplemented copy to acc";
+  MSHADOW_TYPE_SWITCH(to->type_flag_, DstDType, {
+      MSHADOW_TYPE_SWITCH(from.type_flag_, SrcDType, {
+          if(to_ctx.getAccel().copyTo(to->dptr<DstDType>(), from.dptr<SrcDType>(), from.Size()))
+            LOG(FATAL) << "Error copying from CPU to " << to_ctx;
+        });
+    });
 }
 
-  template<>
-  void Copy<mshadow::acc, cpu>(const TBlob &from, TBlob *to,
+template<>
+void Copy<mshadow::acc, cpu>(const TBlob &from, TBlob *to,
                     Context from_ctx, Context to_ctx,
                     RunContext ctx) {
-    LOG(FATAL) << "Unimplemented copy from acc";
+  MSHADOW_TYPE_SWITCH(to->type_flag_, DstDType, {
+      MSHADOW_TYPE_SWITCH(from.type_flag_, SrcDType, {
+          if(from_ctx.getAccel().copyFrom(to->dptr<DstDType>(), from.dptr<SrcDType>(), from.Size()))
+            LOG(FATAL) << "Error copying from " << to_ctx << " to CPU";
+        });
+    });
 }
 
-  template<>
-  void Copy<mshadow::acc, mshadow::acc>(const TBlob &from, TBlob *to,
+template<>
+void Copy<mshadow::acc, mshadow::acc>(const TBlob &from, TBlob *to,
                     Context from_ctx, Context to_ctx,
                     RunContext ctx) {
-    LOG(FATAL) << "Unimplemented copy within acc";
+  MSHADOW_TYPE_SWITCH(to->type_flag_, DstDType, {
+      MSHADOW_TYPE_SWITCH(from.type_flag_, SrcDType, {
+          if(to_ctx.getAccel().copyBetween(to->dptr<DstDType>(), from.dptr<SrcDType>(), from.Size()))
+            LOG(FATAL) << "Error copying within " << to_ctx;
+        });
+    });
 }
 
 template<typename DType, typename IType>

@@ -149,7 +149,10 @@ using Op = nnvm::Op;
    void (*releaseAll)();
    void (*free)(void*);
    void (*directFree)(void*);
-   void* (*alloc)(size_t size);
+   void* (*alloc)(size_t);
+   int (*copyTo)(void*, void*, size_t);
+   int (*copyFrom)(void*, void*, size_t);
+   int (*copyBetween)(void*, void*, size_t);
          
    /*! \brief default constructor */
  AccContext() : kAccType(0), accName("Error") {}
@@ -205,7 +208,10 @@ struct Context {
     return dev_type >= kAccBase;
   }
   inline AccContext getAccel() const {
-    return acc_map[dev_type];
+    if (acc_map.find(dev_type) != acc_map.end())
+      return acc_map[dev_type];
+    else
+      LOG(FATAL) << "Unable to get the accelerator for dev_type " << dev_type;
   }
   /*!
    * \brief Comparator, used to enable Context as std::map key.
@@ -479,17 +485,29 @@ inline Context Context::FromString(const std::string& str) {
      LOG(FATAL) << "Unable to get releaseAll function from library";
 
    get_func(lib, (void**)(&(ctx.free)), (char*)"free");
-   if(!ctx.getFCompute)
+   if(!ctx.free)
      LOG(FATAL) << "Unable to get free function from library";
 
    get_func(lib, (void**)(&(ctx.directFree)), (char*)"directFree");
-   if(!ctx.getFCompute)
+   if(!ctx.directFree)
      LOG(FATAL) << "Unable to get directFree function from library";
 
    get_func(lib, (void**)(&(ctx.alloc)), (char*)"alloc");
-   if(!ctx.getFCompute)
+   if(!ctx.alloc)
      LOG(FATAL) << "Unable to get alloc function from library";
-   
+
+   get_func(lib, (void**)(&(ctx.copyTo)), (char*)"copyTo");
+   if(!ctx.copyTo)
+     LOG(FATAL) << "Unable to get copyTo function from library";
+
+   get_func(lib, (void**)(&(ctx.copyFrom)), (char*)"copyFrom");
+   if(!ctx.copyFrom)
+     LOG(FATAL) << "Unable to get copyFrom function from library";
+
+   get_func(lib, (void**)(&(ctx.copyBetween)), (char*)"copyBetween");
+   if(!ctx.copyBetween)
+     LOG(FATAL) << "Unable to get copyBetween function from library";
+
    //add accelerator context to map
    Context::acc_map[id] = ctx;
    Context::acc_names[name_str] = id;

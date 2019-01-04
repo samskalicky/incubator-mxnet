@@ -66,8 +66,6 @@ class AccStorageManager final : public StorageManager {
 };  // class AccStorageManager
 
 void AccStorageManager::Alloc(Storage::Handle* handle) {
-  std::cout << "Acc alloc" << std::endl;
-  std::cout << (void*)(accel.alloc) << std::endl;
   handle->dptr = accel.alloc(handle->size);
   if(handle->dptr == 0)
     LOG(FATAL) << "Error! Accelerator " << ctx << " alloc returned 0";
@@ -82,7 +80,6 @@ void AccStorageManager::DirectFree(Storage::Handle handle) {
 }
  
 void AccStorageManager::ReleaseAll() {
-  std::cout << "Acc releaseAll" << std::endl;
   accel.releaseAll();
 }
 

@@ -110,7 +110,9 @@ enum class FnProperty {
   /*! \brief Delete variable call */
   kDeleteVar,
   /*! \brief Prioritized sync operation on GPU */
-  kGPUPrioritized
+  kGPUPrioritized,
+  /*! \brief Prioritized sync operation on Acc */
+  kAccPrioritized
 };  // enum class FnProperty
 
 /*!

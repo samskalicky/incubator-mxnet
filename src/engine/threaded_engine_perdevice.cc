@@ -60,6 +60,9 @@ class ThreadedEnginePerDevice : public ThreadedEngine {
 
   void StopNoWait() {
     SignalQueuesForKill();
+    acc_normal_workers_.Clear();
+    acc_priority_workers_.Clear();
+    acc_copy_workers_.Clear();
     gpu_normal_workers_.Clear();
     gpu_priority_workers_.Clear();
     gpu_copy_workers_.Clear();
@@ -76,8 +79,10 @@ class ThreadedEnginePerDevice : public ThreadedEngine {
   void Start() override {
     if (is_worker_) return;
     gpu_worker_nthreads_ = common::GetNumThreadsPerGPU();
+    acc_worker_nthreads_ = 2;
     cpu_worker_nthreads_ = dmlc::GetEnv("MXNET_CPU_WORKER_NTHREADS", 1);
     gpu_copy_nthreads_ = dmlc::GetEnv("MXNET_GPU_COPY_NTHREADS", 2);
+    acc_copy_nthreads_ = 2;
     // create CPU task
     int cpu_priority_nthreads = dmlc::GetEnv("MXNET_CPU_PRIORITY_NTHREADS", 4);
     cpu_priority_worker_.reset(new ThreadWorkerBlock<kPriorityQueue>());
@@ -195,7 +200,73 @@ class ThreadedEnginePerDevice : public ThreadedEngine {
           }
         }
       } else if(ctx.isAcc()) {
-        LOG(FATAL) << "Unimplemented for accelerator " << ctx;
+        // Acc execution.
+        const FnProperty prop = opr_block->opr->prop;
+        const bool is_copy = (prop == FnProperty::kCopyFromAcc ||
+                              prop == FnProperty::kCopyToAcc);
+        if (is_copy) {
+          const size_t nthread = acc_copy_nthreads_;
+          auto ptr = acc_copy_workers_.Get(ctx.dev_id, [this, ctx, is_copy, nthread]() {
+            // Signify to kernel that Acc is being used, so reserve cores as necessary
+            OpenMP::Get()->set_reserve_cores(GetReserveCoreCount(true));
+            auto blk = new ThreadWorkerBlock<kCopyQueue>();
+              blk->pool.reset(new ThreadPool(
+                nthread,
+                [this, ctx, is_copy, blk]
+                  (std::shared_ptr<dmlc::ManualEvent> ready_event) {
+                    this->AccWorker(ctx, is_copy, blk, ready_event);
+                  }, true));
+              return blk;
+            });
+          if (ptr) {
+            if (opr_block->opr->prop == FnProperty::kDeleteVar) {
+              ptr->task_queue.PushFront(opr_block, opr_block->priority);
+            } else {
+              ptr->task_queue.Push(opr_block, opr_block->priority);
+            }
+          }
+        } else {
+          const size_t nthread = acc_worker_nthreads_;
+          // Acc priority task
+          if (opr_block->opr->prop == FnProperty::kAccPrioritized) {
+            auto ptr = acc_priority_workers_.Get(ctx.dev_id, [this, ctx, is_copy, nthread]() {
+              // Signify to kernel that Acc is being used, so reserve cores as necessary
+              OpenMP::Get()->set_reserve_cores(GetReserveCoreCount(true));
+                auto blk = new ThreadWorkerBlock<kPriorityQueue>();
+                blk->pool.reset(new ThreadPool(
+                  nthread,
+                  [this, ctx, is_copy, blk]
+                    (std::shared_ptr<dmlc::ManualEvent> ready_event) {
+                      this->AccWorker(ctx, is_copy, blk, ready_event);
+                    }, true));
+                return blk;
+            });
+            if (ptr) {
+              ptr->task_queue.Push(opr_block, opr_block->priority);
+            }
+          } else {
+            // Acc normal task
+            auto ptr = acc_normal_workers_.Get(ctx.dev_id, [this, ctx, is_copy, nthread]() {
+              // Signify to kernel that Acc is being used, so reserve cores as necessary
+              OpenMP::Get()->set_reserve_cores(GetReserveCoreCount(true));
+                auto blk = new ThreadWorkerBlock<kWorkerQueue>();
+                blk->pool.reset(new ThreadPool(
+                  nthread,
+                  [this, ctx, is_copy, blk]
+                    (std::shared_ptr<dmlc::ManualEvent> ready_event) {
+                      this->AccWorker(ctx, is_copy, blk, ready_event);
+                    }, true));
+                return blk;
+            });
+            if (ptr) {
+              if (opr_block->opr->prop == FnProperty::kDeleteVar) {
+                ptr->task_queue.PushFront(opr_block, opr_block->priority);
+              } else {
+                ptr->task_queue.Push(opr_block, opr_block->priority);
+              }
+            }
+          }
+        }
       } else {
         LOG(FATAL) << "Unimplemented for device " << ctx;
       }
@@ -224,16 +295,29 @@ class ThreadedEnginePerDevice : public ThreadedEngine {
   size_t gpu_worker_nthreads_;
   /*! \brief number of concurrent thread each gpu copy worker uses */
   size_t gpu_copy_nthreads_;
+  /*! \brief number of concurrent thread each acc worker uses */
+  size_t acc_worker_nthreads_;
+  /*! \brief number of concurrent thread each acc copy worker uses */
+  size_t acc_copy_nthreads_;
+
   // cpu worker
   common::LazyAllocArray<ThreadWorkerBlock<kWorkerQueue> > cpu_normal_workers_;
   // cpu priority worker
   std::unique_ptr<ThreadWorkerBlock<kPriorityQueue> > cpu_priority_worker_;
+
   // workers doing normal works on GPU
   common::LazyAllocArray<ThreadWorkerBlock<kWorkerQueue> > gpu_normal_workers_;
   // workers doing copy works from/to GPU
   common::LazyAllocArray<ThreadWorkerBlock<kCopyQueue> > gpu_copy_workers_;
   // gpu priority workers
   common::LazyAllocArray<ThreadWorkerBlock<kPriorityQueue> > gpu_priority_workers_;
+
+  // workers doing normal works on Acc
+  common::LazyAllocArray<ThreadWorkerBlock<kWorkerQueue> > acc_normal_workers_;
+  // workers doing copy works from/to Acc
+  common::LazyAllocArray<ThreadWorkerBlock<kCopyQueue> > acc_copy_workers_;
+  // acc priority workers
+  common::LazyAllocArray<ThreadWorkerBlock<kPriorityQueue> > acc_priority_workers_;
   /*!
    * \brief GPU worker that performs operations on a certain device.
    * \param dev_id The device id of the worker.
@@ -300,7 +384,34 @@ class ThreadedEnginePerDevice : public ThreadedEngine {
       this->ExecuteOprBlock(run_ctx, opr_block);
     }
   }
+  /*!
+   * \brief Acc worker that performs operations on a certain device.
+   * \param dev_id The device id of the worker.
+   * \param is_copy_worker whether the worker only do copy job
+   * \param block The task block of the worker.
+   */
+  template<dmlc::ConcurrentQueueType type>
+  inline void AccWorker(Context ctx,
+                        bool is_copy_worker,
+                        ThreadWorkerBlock<type> *block,
+                        const std::shared_ptr<dmlc::ManualEvent>& ready_event) {
+    this->is_worker_ = true;
+    CHECK(block != nullptr);
+    // execute task
+    OprBlock* opr_block;
+    RunContext run_ctx{ctx, nullptr};
+    auto* task_queue = &(block->task_queue);
 
+    // Don't eat up omp threads for Acc jobs.  They're probably best used elsewhere,
+    // for example for image decoding or the optimizer pass
+    OpenMP::Get()->on_start_worker_thread(false);
+
+    while (task_queue->Pop(&opr_block)) {
+      this->ExecuteOprBlock(run_ctx, opr_block);
+    }
+    ready_event->signal();
+  }
+  
   /*!
    * \brief Get number of cores this engine should reserve for its own use
    * \param using_gpu Whether there is GPU usage
@@ -332,6 +443,9 @@ class ThreadedEnginePerDevice : public ThreadedEngine {
 
   /*! Signal all queues for shutdown */
   void SignalQueuesForKill() {
+    SignalQueueForKill(&acc_priority_workers_);
+    SignalQueueForKill(&acc_normal_workers_);
+    SignalQueueForKill(&acc_copy_workers_);
     SignalQueueForKill(&gpu_priority_workers_);
     SignalQueueForKill(&gpu_normal_workers_);
     SignalQueueForKill(&gpu_copy_workers_);

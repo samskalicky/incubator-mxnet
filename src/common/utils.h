@@ -658,7 +658,9 @@ FCompType GetFCompute(const nnvm::Op* op, const std::string& name,
     void** fcomp = acc.getFCompute(op->name.c_str());
     if(!fcomp)
       LOG(FATAL) << "Unsupported FCompute for op: '" << op->name << "' on eacc: " << Context::acc_map[ctx.dev_type].accName;
-    LOG(FATAL) << "Not sure what to do here...";
+    LOG(FATAL) << "not sure what to do here...";
+    //else
+    // return fcomp;
   } else {
     LOG(FATAL) << "Unknown device mask";
     return nullptr;
