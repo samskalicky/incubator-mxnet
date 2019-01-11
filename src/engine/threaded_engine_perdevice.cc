@@ -395,6 +395,7 @@ class ThreadedEnginePerDevice : public ThreadedEngine {
                         bool is_copy_worker,
                         ThreadWorkerBlock<type> *block,
                         const std::shared_ptr<dmlc::ManualEvent>& ready_event) {
+    std::cout << "AccWorker" << std::endl;
     this->is_worker_ = true;
     CHECK(block != nullptr);
     // execute task
@@ -407,6 +408,7 @@ class ThreadedEnginePerDevice : public ThreadedEngine {
     OpenMP::Get()->on_start_worker_thread(false);
 
     while (task_queue->Pop(&opr_block)) {
+      std::cout << "AccWorker wait" << std::endl;
       this->ExecuteOprBlock(run_ctx, opr_block);
     }
     ready_event->signal();

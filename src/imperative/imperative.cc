@@ -56,9 +56,16 @@ OpStatePtr Imperative::InvokeOp(
   SetDependency(attrs, ctx, inputs, outputs,
       &read_vars, &write_vars, &requested, &mutate_idx, dispatch_mode);
 
+  AccExec fcomp = nullptr;
+  if(ctx.isAcc()) {
+    AccContext acc = Context::acc_map[ctx.dev_type];
+    fcomp = acc.getFCompute(op->name.c_str());
+    if(!fcomp)
+      LOG(FATAL) << "Unsupported FCompute for op: '" << op->name << "' on eacc: " << Context::acc_map[ctx.dev_type].accName;
+  }
   FCompute fn = common::GetFCompute<FCompute>(op, "FCompute", ctx);
   FComputeEx fn_ex = common::GetFCompute<FComputeEx>(op, "FComputeEx", ctx);
-
+  
   // FComputeEx is dispatched only when dispatch_mode is DispatchMode::kFComputeEx
   CHECK(dispatch_mode != DispatchMode::kUndefined);
   bool dispatch_fcompex = dispatch_mode == DispatchMode::kFComputeEx;
@@ -67,7 +74,7 @@ OpStatePtr Imperative::InvokeOp(
         requested, inputs, outputs, req);
   } else if (fn) {
     PushFCompute(fn, op, attrs, ctx, read_vars, write_vars,
-        requested, inputs, outputs, mutate_idx, req);
+                 requested, inputs, outputs, mutate_idx, req, fcomp);
   } else if (createop.count(op) || is_layer_backward.get(op, false)) {
     if (!state) {
       state = createop[op](attrs, ctx, ret->arg_shapes, ret->arg_types);

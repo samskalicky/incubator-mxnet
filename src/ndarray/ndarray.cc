@@ -1147,7 +1147,7 @@ void CopyFromToImpl(const NDArray& from, const NDArray& to,
 
   OpContext opctx{Imperative::Get()->is_recording(),
                   is_train,
-                  rctx,
+      rctx, nullptr,
                   engine::CallbackOnComplete(),
                   requested};
   if (from_ctx == to_ctx && from_stype != to_stype) {

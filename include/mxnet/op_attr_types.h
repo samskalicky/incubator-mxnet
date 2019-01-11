@@ -36,6 +36,7 @@
 #include "./ndarray.h"
 #include "./engine.h"
 #include "./resource.h"
+#include "./mxnet_acc.h"
 
 namespace mxnet {
 
@@ -70,6 +71,8 @@ struct OpContext {
   bool is_train;
   /*! \brief RunContext related resources */
   RunContext run_ctx;
+  /*! \brief  accelerator function */
+  AccExec acc_func;
   /*! \brief the callback when operation completes, used by asynchronize ops */
   engine::CallbackOnComplete async_on_complete;
   /*! \brief Resources requested by the operator */

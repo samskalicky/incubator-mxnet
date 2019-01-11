@@ -145,7 +145,7 @@ using Op = nnvm::Op;
  struct AccContext {
    int kAccType;
    std::string accName;
-   void** (*getFCompute)(const char*);
+   AccExec (*getFCompute)(const char*);
    void (*releaseAll)();
    void (*free)(void*);
    void (*directFree)(void*);

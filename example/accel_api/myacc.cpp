@@ -56,16 +56,24 @@ extern "C" int copyBetween(void* dst, void* src, size_t size) {
  * Operator FCompute functions
  */
 int exp(int a, void* b);
+int broadcast_add(int a, void* b);
 
-extern "C" FCompute* getFCompute(const char* name) {
+extern "C" AccExec getFCompute(const char* name) {
   std::string fname(name);
   if(fname.compare("exp")==0)
     return &exp;
+  else if(fname.compare("broadcast_add")==0)
+    return &broadcast_add;
   else
     return 0;
 }
 
 int exp(int a, void* b) {
   std::cout << "exp" << std::endl;
+  return 0;
+}
+
+int broadcast_add(int a, void* b) {
+  std::cout << "add" << std::endl;
   return 0;
 }
