@@ -4,6 +4,8 @@ typedef int (*AccExec)(int, void*);
 
 extern "C" void getAccName(char*);
 extern "C" AccExec getFCompute(const char*);
+extern "C" void analyzeGraph(const char*);
+
 extern "C" void releaseAll();
 extern "C" void free(void*);
 extern "C" void directFree(void*);

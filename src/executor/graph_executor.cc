@@ -34,6 +34,7 @@
 #include "../common/utils.h"
 #include "../common/exec_utils.h"
 #include "../operator/subgraph/subgraph_property.h"
+#include "../common/acc_util.h"
 
 namespace mxnet {
 namespace exec {
@@ -1397,6 +1398,14 @@ GraphExecutor::CachedSegOpr GraphExecutor::CreateCachedSegOpr(size_t topo_start,
               std::inserter(mutate_vars, mutate_vars.end()));
     std::copy(op_node.use_vars.begin(), op_node.use_vars.end(),
               std::inserter(use_vars, use_vars.end()));
+
+    if(op_node.ctx.isAcc()) {
+      AccContext acc = Context::acc_map[op_node.ctx.dev_type];
+      exec->op_ctx.acc_func = acc.getFCompute(inode.source->op()->name.c_str());
+      if(!exec->op_ctx.acc_func)
+        LOG(FATAL) << "Unsupported FCompute for op: '" << inode.source->op()->name << "' on acc: " << Context::acc_map[op_node.ctx.dev_type].accName;
+    }
+    
     ret.exec_list.push_back(exec);
     opr_names += inode.source->op()->name + ",";
   }
@@ -1630,7 +1639,14 @@ Executor *Executor::Bind(nnvm::Symbol symbol,
                          Executor* shared_exec) {
   auto exec = new exec::GraphExecutor();
   std::vector<NDArray> tmp_in_args = in_args;
+
+  if(default_ctx.isAcc()) {
+    std::string json(convertSym(symbol));
+    default_ctx.getAccel().analyzeGraph(json.c_str());
+  }
+
   if (!exec->subgraph_property().empty()) {
+    std::cout << "partitioning..." << std::endl;
     symbol = exec::PartitionGraph(symbol, exec->subgraph_property(), &tmp_in_args, aux_states,
                                   default_ctx, group2ctx);
   }

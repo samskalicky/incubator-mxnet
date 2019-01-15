@@ -22,7 +22,10 @@ void AccOpForward(const nnvm::NodeAttrs& attrs,
   using namespace mshadow;
   std::cout << "AccOp: " << inputs.size() << " inputs, " << outputs.size() << " outputs" << std::endl;
   AccExec fcomp = ctx.acc_func;
-  fcomp(0,0);
+  if(!fcomp)
+    LOG(ERROR) << "acc_func not set!";
+  else
+    fcomp(0,0);
 }
 
 }  // namespace op

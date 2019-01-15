@@ -29,6 +29,7 @@
 #include "../profiler/profiler.h"
 #include "./openmp.h"
 #include "../common/object_pool.h"
+#include "../../include/mxnet/mxnet_acc.h"
 
 namespace mxnet {
 namespace engine {

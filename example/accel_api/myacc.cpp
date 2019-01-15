@@ -15,6 +15,11 @@ extern "C" void getAccName(char* s) {
   strcpy(s,name.c_str());
 }
 
+extern "C" void analyzeGraph(const char* json) {
+  std::string graph(json);
+  std::cout << graph << std::endl;
+}
+
 /*
  * Memory Management functions
  */

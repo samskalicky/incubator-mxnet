@@ -146,6 +146,7 @@ using Op = nnvm::Op;
    int kAccType;
    std::string accName;
    AccExec (*getFCompute)(const char*);
+   void (*analyzeGraph)(const char*);
    void (*releaseAll)();
    void (*free)(void*);
    void (*directFree)(void*);
@@ -153,7 +154,7 @@ using Op = nnvm::Op;
    int (*copyTo)(void*, void*, size_t);
    int (*copyFrom)(void*, void*, size_t);
    int (*copyBetween)(void*, void*, size_t);
-         
+   
    /*! \brief default constructor */
  AccContext() : kAccType(0), accName("Error") {}
    /*! \brief constructor */
@@ -479,6 +480,10 @@ inline Context Context::FromString(const std::string& str) {
    get_func(lib, (void**)(&(ctx.getFCompute)), (char*)"getFCompute");
    if(!ctx.getFCompute)
      LOG(FATAL) << "Unable to get getFCompute function from library";
+
+   get_func(lib, (void**)(&(ctx.analyzeGraph)), (char*)"analyzeGraph");
+   if(!ctx.analyzeGraph)
+     LOG(FATAL) << "Unable to get analyzeGraph function from library";
 
    get_func(lib, (void**)(&(ctx.releaseAll)), (char*)"releaseAll");
    if(!ctx.releaseAll)
