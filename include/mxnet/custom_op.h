@@ -7,11 +7,11 @@
 #ifndef _MXNET_CUSTOM_OP_H_
 #define _MXNET_CUSTOM_OP_H_
 
-using FCompute = std::function<void ()>;
+using FComputeOp = std::function<void ()>;
 
 class CustomOp {
  public:
-  CustomOp& setFCompute(FCompute fcomp) {
+  CustomOp& setFCompute(FComputeOp fcomp) {
     return *this;
   }
   CustomOp(const char* name) {}

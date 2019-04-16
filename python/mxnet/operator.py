@@ -22,6 +22,8 @@ from __future__ import absolute_import
 
 import traceback
 import warnings
+import ctypes
+import os
 
 from array import array
 from threading import Lock
@@ -1097,5 +1099,21 @@ def register(reg_name):
         _registry.ref_holder[cur] = creator_func
         return prop_cls
     return do_register
+
+def load_op_lib(path):
+    #check if path exists
+    if not os.path.exists(path):
+        print('Error loading operator library: path "%s" does NOT exist' % path)
+        return
+    #check if path is to a file
+    if not os.path.isfile(path):
+        print('Error loading operator library: path "%s" is NOT a library file' % path)
+        return
+
+    barr = path.encode('utf-8')
+    chararr = ctypes.c_char_p(barr)
+
+    check_call(_LIB.MXLoadCustomOpLib(chararr))
+
 
 register("custom_op")(CustomOpProp)

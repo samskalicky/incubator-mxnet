@@ -232,6 +232,14 @@ MXNET_DLL const char *MXGetLastError();
  * \param size of the array
  * \return 0 when success, -1 when failure happens.
  */
+MXNET_DLL int MXLoadCustomOpLib(const char* path);
+
+/*!
+ * \brief Get list of features supported on the runtime
+ * \param libFeature pointer to array of LibFeature
+ * \param size of the array
+ * \return 0 when success, -1 when failure happens.
+ */
 MXNET_DLL int MXLibInfoFeatures(const struct LibFeature **libFeature, size_t *size);
 
 /*!

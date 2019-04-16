@@ -47,6 +47,8 @@
 #include "./c_api_common.h"
 #include "../operator/custom/custom-inl.h"
 #include "../operator/tensor/matrix_op-inl.h"
+#include "mxnet/library.h"
+#include "mxnet/custom_op.h"
 
 using namespace mxnet;
 
@@ -86,6 +88,24 @@ inline int MXAPIGetFunctionRegInfo(const FunRegType *e,
 }
 
 // NOTE: return value is added in API_END
+
+int MXLoadCustomOpLib(const char* path) {
+  API_BEGIN();
+
+  //load library
+  void *lib = load_lib(path);
+  if(!lib) return -1;
+
+  //get pointer to function containing registered custom ops
+  OpRegistry* (*global_get)();
+  get_func(lib, (void**)(&global_get), (char*)"GlobalGet");
+  if(!global_get) return -1;
+
+  OpRegistry* reg = global_get();
+  reg->list();
+
+  API_END();
+}
 
 int MXLibInfoFeatures(const struct LibFeature **lib_features, size_t *size) {
   using namespace features;
