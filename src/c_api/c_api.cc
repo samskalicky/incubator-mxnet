@@ -44,11 +44,13 @@
 #include "mxnet/rtc.h"
 #include "mxnet/storage.h"
 #include "mxnet/libinfo.h"
+#include "mxnet/imperative.h"
 #include "./c_api_common.h"
 #include "../operator/custom/custom-inl.h"
 #include "../operator/tensor/matrix_op-inl.h"
 #include "mxnet/library.h"
 #include "mxnet/custom_op.h"
+#include "../common/utils.h"
 
 using namespace mxnet;
 
@@ -491,7 +493,7 @@ MXNET_DLL int MXNDArrayReshape64(NDArrayHandle handle,
   NDArray *ptr = new NDArray();
   API_BEGIN();
   NDArray *arr = static_cast<NDArray*>(handle);
-  nnvm::Tuple<dim_t> shape(dims, dims+ndim);
+  mxnet::Tuple<dim_t> shape(dims, dims+ndim);
   CHECK_GT(arr->shape().Size(), 0) << "Source ndarray's shape is undefined. Input shape: "
     << arr->shape();
   mxnet::TShape new_shape = mxnet::op::InferReshapeShape(shape, arr->shape(), reverse);
@@ -527,6 +529,34 @@ int MXNDArrayGetShape(NDArrayHandle handle,
     *out_pdata = buffer.data();
   } else {
     *out_dim = 0;
+  }
+  API_END();
+}
+
+int MXNDArrayGetShapeEx(NDArrayHandle handle,
+                        int *out_dim,
+                        const int **out_pdata) {
+  MXAPIThreadLocalEntry *ret = MXAPIThreadLocalStore::Get();
+  API_BEGIN();
+  NDArray *arr = static_cast<NDArray*>(handle);
+  if (!arr->is_none()) {
+    mxnet::TShape s = arr->shape();
+    if (!Imperative::Get()->is_np_comp()) {
+      common::ConvertToLegacyShape(&s);
+    }
+    *out_dim = s.ndim();
+    if (s.ndim() >= 0) {
+      std::vector<int> &buffer = ret->arg_shape_buffer_ex;
+      buffer.resize(s.ndim());
+      mxnet::ShapeTypeCast(s.begin(), s.end(), buffer.data());
+      *out_pdata = buffer.data();
+    }
+  } else {
+    if (Imperative::Get()->is_np_comp()) {
+      *out_dim = -1;
+    } else {
+      *out_dim = 0;
+    }
   }
   API_END();
 }
@@ -811,7 +841,7 @@ int MXDataIterGetLabel(DataIterHandle handle, NDArrayHandle *out) {
   // temp hack to make label 1D
   // TODO(tianjun) make label 1D when label_width=0
   mxnet::TShape shape = db.data[1].shape();
-  if (shape[1] == 1) {
+  if (shape.ndim() > 1 && shape[1] == 1) {
     *pndarray = db.data[1].Reshape(mshadow::Shape1(shape[0]));
   } else {
     *pndarray = db.data[1];
@@ -1417,6 +1447,13 @@ int MXNDArrayGetSharedMemHandle(NDArrayHandle handle, int* shared_pid, int* shar
 
 int MXNDArrayCreateFromSharedMem(int shared_pid, int shared_id, const mx_uint *shape,
                                  mx_uint ndim, int dtype, NDArrayHandle *out) {
+  API_BEGIN();
+  *out = new NDArray(shared_pid, shared_id, mxnet::TShape(shape, shape + ndim), dtype);
+  API_END();
+}
+
+int MXNDArrayCreateFromSharedMemEx(int shared_pid, int shared_id, const int *shape,
+                                   int ndim, int dtype, NDArrayHandle *out) {
   API_BEGIN();
   *out = new NDArray(shared_pid, shared_id, mxnet::TShape(shape, shape + ndim), dtype);
   API_END();
