@@ -3,8 +3,9 @@
 
 #include <dlfcn.h>
 #include <iostream>
+#include "mxnet/custom_op.h"
 
 void* load_lib(const char* path);
-void get_func(void* handle, void** func, char* name);
+void get_func(void* handle, void_ptr func, char* name);
 
 #endif

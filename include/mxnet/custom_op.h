@@ -1,5 +1,6 @@
 #include <iostream>
 #include <map>
+#include <vector>
 #include <string>
 #include <functional>
 
@@ -7,15 +8,31 @@
 #ifndef _MXNET_CUSTOM_OP_H_
 #define _MXNET_CUSTOM_OP_H_
 
-using FComputeOp = std::function<void ()>;
+typedef void (*void_t)(void);
+typedef void_t* void_ptr;
+typedef void (*fcomp_t)(void);
+typedef int (*get_size_t)(void);
+typedef void (*get_op_t)(int, char**, fcomp_t*);
 
 class CustomOp {
  public:
-  CustomOp& setFCompute(FComputeOp fcomp) {
+  CustomOp& setFCompute(fcomp_t fcomp) {
+    fcompute = fcomp;
     return *this;
   }
-  CustomOp(const char* name) {}
+  fcomp_t getFCompute() {
+    return fcompute;
+  }
+  const char* getName() {
+    return name;
+  }
+ CustomOp(const char* op_name) : name(op_name) {
+    fcompute = nullptr;
+  }
   ~CustomOp() {}
+ private:
+  fcomp_t fcompute;
+  const char* name;
 };
 
 
@@ -28,27 +45,45 @@ class OpRegistry {
   CustomOp& add(const char* name) {
     CustomOp *op = new CustomOp(name);
     entries[std::string(name)]=op;
+    names.push_back(std::string(name));
     return *op;
   }
-  void list() {
-    std::map<std::string, CustomOp*>::const_iterator p;
-    for (p = entries.begin(); p !=entries.end(); ++p) {
-      std::cout << p->first << std::endl;
-    }
+  int size() {
+    return entries.size();
   }
+  void getOp(int idx, const char** name, fcomp_t* func) {
+    std::string op = names[idx];
+    *name = entries[op]->getName();
+    *func = entries[op]->getFCompute();
+  }
+  CustomOp* op(const std::string name) {
+    return op(name.c_str());
+  }
+  CustomOp* op(const char* name) {
+    return entries[name];
+  }
+
  private:
   std::map<std::string,CustomOp*> entries;
+  std::vector<std::string> names;
   /*! \brief constructor */
   OpRegistry() {}
   /*! \brief destructor */
   ~OpRegistry() {}
 };
 
-extern "C" OpRegistry* GlobalGet() {
-  return OpRegistry::get();
+extern "C" {
+  static int _opRegSize() {
+    return OpRegistry::get()->size();
+  }
+
+  static void _opRegGet(int idx, const char** name, fcomp_t* func) {
+    OpRegistry::get()->getOp(idx,name,func);
+  }
 }
 
 /*********************************************************************************/
+
 /*********************************************************************************/
 //Macro to help with string concat
 /* Annoyingly, the concat_ and concat macros are necessary to

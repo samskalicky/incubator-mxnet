@@ -26,6 +26,7 @@
 #include <utility>
 #include "./mxnet_op.h"
 #include "./operator_common.h"
+#include "mxnet/custom_op.h"
 
 namespace mxnet {
 namespace op {
@@ -177,6 +178,12 @@ void Forward(const nnvm::NodeAttrs& attrs,
                    const std::vector<TBlob>& inputs,
                    const std::vector<OpReqType>& req,
                    const std::vector<TBlob>& outputs) {
+  const CustomOpParam& params = nnvm::get<CustomOpParam>(attrs.parsed);
+
+  fcomp_t fcomp = OpRegistry::get()->op(params.op_type)->getFCompute();
+  
+  std::cout << "Forward: " << params.op_type << std::endl;
+  fcomp();
 }
  
 }  // namespace op

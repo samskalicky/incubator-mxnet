@@ -233,6 +233,7 @@ MXNET_DLL const char *MXGetLastError();
  * \return 0 when success, -1 when failure happens.
  */
 MXNET_DLL int MXLoadCustomOpLib(const char* path);
+MXNET_DLL int MXGetCustomOp(const char* path);
 
 /*!
  * \brief Get list of features supported on the runtime

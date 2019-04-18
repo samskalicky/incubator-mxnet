@@ -3,7 +3,7 @@
 
 #include <dlfcn.h>
 #include <iostream>
-
+#include "mxnet/custom_op.h"
 #include "mxnet/library.h"
 
 void* load_lib(const char* path) {
@@ -17,8 +17,8 @@ void* load_lib(const char* path) {
   return handle;
 }
 
-void get_func(void* handle, void** func, char* name) {
-  *(void**)(func) = dlsym(handle, name);
+void get_func(void* handle, void_ptr func, char* name) {
+  *func = (void_t)dlsym(handle, name);
   if(!func) {
     std::cerr << "Error getting function '" << name << "' from accelerator library\n" << dlerror() << std::endl;
   }

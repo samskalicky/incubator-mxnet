@@ -99,13 +99,33 @@ int MXLoadCustomOpLib(const char* path) {
   if(!lib) return -1;
 
   //get pointer to function containing registered custom ops
-  OpRegistry* (*global_get)();
-  get_func(lib, (void**)(&global_get), (char*)"GlobalGet");
-  if(!global_get) return -1;
+  get_size_t get_size;
+  get_func(lib, (void_ptr)(&get_size), (char*)"_opRegSize");
+  if(!get_size) return -1;
 
-  OpRegistry* reg = global_get();
-  reg->list();
+  get_op_t get_op;
+  get_func(lib, (void_ptr)(&get_op), (char*)"_opRegGet");
+  if(!get_op) return -1;
 
+  for(int i=0; i<get_size(); i++) {
+    char* name;
+    fcomp_t fcomp = nullptr;
+    get_op(i,&name,(void_ptr)(&fcomp));
+    fcomp();
+    OpRegistry::get()->add(name).setFCompute(fcomp);
+  }
+
+  API_END();
+}
+
+int MXGetCustomOp(const char* op_name) {
+  API_BEGIN();
+
+  CustomOp *op = OpRegistry::get()->op(op_name);
+  fcomp_t fcomp = op->getFCompute();
+
+  fcomp();
+  
   API_END();
 }
 

@@ -1115,5 +1115,6 @@ def load_op_lib(path):
 
     check_call(_LIB.MXLoadCustomOpLib(chararr))
 
+    
 
 register("custom_op")(CustomOpProp)
