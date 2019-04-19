@@ -20,7 +20,7 @@ void* load_lib(const char* path) {
 void get_func(void* handle, void_ptr func, char* name) {
   *func = (void_t)dlsym(handle, name);
   if(!func) {
-    std::cerr << "Error getting function '" << name << "' from accelerator library\n" << dlerror() << std::endl;
+    std::cerr << "Error getting function '" << name << "' from library\n" << dlerror() << std::endl;
   }
 }
 

@@ -33,39 +33,31 @@ namespace op {
 
 struct CustomOpParam {
   std::string op_type;
-  //size_t num_args, num_outs, num_auxs;
-  //std::vector<int> bwd_idx;
-  //std::shared_ptr<MXCallbackList> info;
 };
 
 void AttrParser(NodeAttrs* attrs) {
   attrs->parsed = CustomOpParam();
   CustomOpParam& params = nnvm::get<CustomOpParam>(attrs->parsed);
 
-  std::vector<const char*> keys, vals;
+  char const** keys;
+  char const** vals;
+  int idx=0;
   for (auto& p : attrs->dict) {
     if (p.first == "op_type") {
       params.op_type = p.second;
     }
-    /*
     else {
-      keys.push_back(p.first.c_str());
-      vals.push_back(p.second.c_str());
+      keys[idx] = p.first.c_str();
+      vals[idx++] = p.second.c_str();
     }
-    */
   }
   
   CHECK(!params.op_type.empty()) << "Required argument `op_type` is missing.";
-
+  CHECK(OpRegistry::get()->hasOp(params.op_type)) << "Cannot find custom operator " << params.op_type;
+  CustomOp *op = OpRegistry::get()->op(params.op_type);
+  op->getParseAttrs()(keys,vals,idx);
   /*
-  CustomOpPropCreator creator = CustomOperator::Get()->Find(params.op_type);
-  CHECK(CustomOperator::Get()->Find(params.op_type) != nullptr)
-      << "Cannot find custom operator " << params.op_type;
-  params.info.reset(new MXCallbackList, [](MXCallbackList* ptr){
-      reinterpret_cast<CustomOpDelFunc>(ptr->callbacks[kCustomOpPropDelete])(
-        ptr->contexts[kCustomOpPropDelete]);
-      delete ptr;
-    });
+
   CHECK(creator(params.op_type.c_str(), keys.size(), keys.data(),
                 vals.data(), params.info.get()));
 

@@ -96,36 +96,37 @@ int MXLoadCustomOpLib(const char* path) {
 
   //load library
   void *lib = load_lib(path);
-  if(!lib) return -1;
+  CHECK(lib) << "Error loading library";
 
-  //get pointer to function containing registered custom ops
+  //get pointer to function to get the number of custom ops in lib
   get_size_t get_size;
   get_func(lib, (void_ptr)(&get_size), (char*)"_opRegSize");
-  if(!get_size) return -1;
+  CHECK(get_size) << "Error getting get_size function from library";
 
+  //get pointer to function to get op from lib
   get_op_t get_op;
   get_func(lib, (void_ptr)(&get_op), (char*)"_opRegGet");
-  if(!get_op) return -1;
+  CHECK(get_op) << "Error getting get_op function from library";
 
+  //loop and register ops from lib
   for(int i=0; i<get_size(); i++) {
     char* name;
     fcomp_t fcomp = nullptr;
-    get_op(i,&name,(void_ptr)(&fcomp));
-    fcomp();
-    OpRegistry::get()->add(name).setFCompute(fcomp);
+    parseAttrs_t parse = nullptr;
+    //get op
+    get_op(i,&name,
+           (&fcomp),
+           (&parse));
+
+    CHECK(fcomp != nullptr) << "Error loading '" << name << "' custom op, FCompute function was not set.";
+    CHECK(parse != nullptr) << "Error loading '" << name << "' custom op, ParseAttrs function was not set.";
+    
+    //register op
+    OpRegistry::get()->add(name)
+      .setFCompute(fcomp)
+      .setParseAttrs(parse);
   }
 
-  API_END();
-}
-
-int MXGetCustomOp(const char* op_name) {
-  API_BEGIN();
-
-  CustomOp *op = OpRegistry::get()->op(op_name);
-  fcomp_t fcomp = op->getFCompute();
-
-  fcomp();
-  
   API_END();
 }
 
