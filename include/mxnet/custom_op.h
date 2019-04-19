@@ -10,8 +10,8 @@
 
 typedef void (*void_t)(void);
 typedef void_t* void_ptr;
-typedef void (*fcomp_t)(void);
-typedef int (*parseAttrs_t)(char const**,char const**,int);
+typedef void (*fcomp_t)(char const**, char const**, int);
+typedef int (*parseAttrs_t)(char const**, char const**, int);
 
 typedef int (*get_size_t)(void);
 typedef void (*get_op_t)(int, char**, fcomp_t*, parseAttrs_t*);

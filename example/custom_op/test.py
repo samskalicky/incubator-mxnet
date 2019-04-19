@@ -7,6 +7,6 @@ try:
 except Exception as e:
     print(e)
 
-mx.nd.CustomOp('sam')
+mx.nd.CustomOp(op_type='sam',myParam='2')
 
 

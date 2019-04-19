@@ -64,7 +64,7 @@ int main() {
     get_op(i,&name,&fcomp,&parse);
     std::cout << "got custom op: " << name << std::endl;
     //call fcompute function
-    (*fcomp)();
+    (*fcomp)(nullptr,nullptr,0);
   }
 
   return 0;

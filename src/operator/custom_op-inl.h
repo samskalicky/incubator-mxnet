@@ -31,31 +31,56 @@
 namespace mxnet {
 namespace op {
 
+  class StringArray {
+  public:
+    char const** strings;
+    int size;
+    void alloc(int num) {
+      size = num;
+      strings = new char const*[size];
+    }
+    char const*& operator[](int idx) {
+      return strings[idx];
+    }
+    StringArray() {
+      strings = nullptr;
+      size = 0;
+    }
+    ~StringArray() {
+      if(!strings)
+        delete[] strings;
+    }
+  };
+  
 struct CustomOpParam {
   std::string op_type;
+  StringArray keys;
+  StringArray vals;
 };
 
 void AttrParser(NodeAttrs* attrs) {
+  std::cout << "in attr parser" << std::endl;
   attrs->parsed = CustomOpParam();
   CustomOpParam& params = nnvm::get<CustomOpParam>(attrs->parsed);
+  std::cout << "parsed" << std::endl;
 
-  char const** keys;
-  char const** vals;
+  params.keys.alloc(attrs->dict.size()-1);
+  params.vals.alloc(attrs->dict.size()-1);
   int idx=0;
   for (auto& p : attrs->dict) {
     if (p.first == "op_type") {
       params.op_type = p.second;
     }
     else {
-      keys[idx] = p.first.c_str();
-      vals[idx++] = p.second.c_str();
+      params.keys[idx] = p.first.c_str();
+      params.vals[idx++] = p.second.c_str();
     }
   }
   
   CHECK(!params.op_type.empty()) << "Required argument `op_type` is missing.";
-  CHECK(OpRegistry::get()->hasOp(params.op_type)) << "Cannot find custom operator " << params.op_type;
+  CHECK(OpRegistry::get()->hasOp(params.op_type)) << "Cannot find custom operator '" << params.op_type << "'";
   CustomOp *op = OpRegistry::get()->op(params.op_type);
-  op->getParseAttrs()(keys,vals,idx);
+  CHECK(op->getParseAttrs()(params.keys.strings,params.vals.strings,idx)) << "Error parsing params for custom operator '" << params.op_type << "'";
   /*
 
   CHECK(creator(params.op_type.c_str(), keys.size(), keys.data(),
@@ -175,7 +200,7 @@ void Forward(const nnvm::NodeAttrs& attrs,
   fcomp_t fcomp = OpRegistry::get()->op(params.op_type)->getFCompute();
   
   std::cout << "Forward: " << params.op_type << std::endl;
-  fcomp();
+  fcomp(params.keys.strings,params.vals.strings,params.keys.size);
 }
  
 }  // namespace op
