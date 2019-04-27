@@ -8,16 +8,66 @@
 #ifndef _MXNET_CUSTOM_OP_H_
 #define _MXNET_CUSTOM_OP_H_
 
+enum MXDType {
+  kFloat32 = 0,
+  kFloat64 = 1,
+  kFloat16 = 2,
+  kUint8 = 3,
+  kInt32 = 4,
+  kInt8  = 5,
+  kInt64 = 6,
+};
+
+struct MXTensor {
+  MXTensor() { data = nullptr; };
+MXTensor(void *data, const std::vector<int64_t> &shape, MXDType dtype)
+: data{data}, shape{shape}, dtype{dtype} {}
+  
+  void *data; // not owned
+  std::vector<int64_t> shape;
+  MXDType dtype;
+};
+
 typedef void (*void_t)(void);
 typedef void_t* void_ptr;
-typedef void (*fcomp_t)(char const**, char const**, int);
-typedef int (*parseAttrs_t)(char const**, char const**, int);
+
+typedef void* (*mxAlloc_t)(void*, unsigned);
+
+typedef void (*fcomp_t)(const char* const*, const char* const*, int,
+                        const long int**, int*, void**, int*,
+                        const long int**, int*, void**, int*);
+                        
+typedef int (*parseAttrs_t)(const char* const*, const char* const*, int,
+                            int*, int*);
+typedef int (*inferType_t)(const char* const*, const char* const*, int,
+                            int*, int*);
+typedef int (*inferShape_t)(mxAlloc_t, void*,
+                            const char* const*, const char* const*, int,
+                            unsigned int**, int*, unsigned int***, int**);
 
 typedef int (*get_size_t)(void);
-typedef void (*get_op_t)(int, char**, fcomp_t*, parseAttrs_t*);
+typedef void (*get_op_t)(int, char**, fcomp_t*, parseAttrs_t*, inferType_t*,
+                         inferShape_t*);
 
 class CustomOp {
  public:
+  static void* CallAllocator(CustomOp* op, unsigned size) {
+    void* ptr = op->allocator(size);
+    return ptr;
+  }
+  
+  void* allocator(unsigned size) {
+    void* ptr = malloc(size);
+    allocations.push_back(ptr);
+    return ptr;
+  }
+  void freeAll() {
+    for(auto ptr : allocations) {
+      free(ptr);
+    }
+  }
+
+  
   CustomOp& setFCompute(fcomp_t fcomp) {
     fcompute = fcomp;
     return *this;
@@ -25,6 +75,20 @@ class CustomOp {
   CustomOp& setParseAttrs(parseAttrs_t func) {
     parse_attrs = func;
     return *this;
+  }
+  CustomOp& setInferType(inferType_t func) {
+    infer_type = func;
+    return *this;
+  }
+  CustomOp& setInferShape(inferShape_t func) {
+    infer_shape = func;
+    return *this;
+  }
+  inferShape_t getInferShape() {
+    return infer_shape;
+  }
+  inferType_t getInferType() {
+    return infer_type;
   }
   parseAttrs_t getParseAttrs() {
     return parse_attrs;
@@ -38,9 +102,14 @@ class CustomOp {
  CustomOp(const char* op_name) : name(op_name) {
     fcompute = nullptr;
     parse_attrs = nullptr;
+    infer_type = nullptr;
+    infer_shape = nullptr;
   }
   ~CustomOp() {}
  private:
+  std::vector<void*> allocations;
+  inferShape_t infer_shape;
+  inferType_t infer_type;
   parseAttrs_t parse_attrs;
   fcomp_t fcompute;
   const char* name;
@@ -62,12 +131,15 @@ class OpRegistry {
     return entries.size();
   }
   void getOp(int idx, const char** name,
-             fcomp_t* func, parseAttrs_t* parse) {
+             fcomp_t* func, parseAttrs_t* parse, inferType_t *type,
+             inferShape_t* shape) {
     std::string op_name = names[idx];
     CustomOp* op = entries[op_name];
     *name = op->getName();
     *func = op->getFCompute();
     *parse = op->getParseAttrs();
+    *type = op->getInferType();
+    *shape = op->getInferShape();
   }
   bool hasOp(const std::string name) {
     return entries.find(name) != entries.end();
@@ -99,8 +171,10 @@ extern "C" {
 #ifndef MXNET_CUSTOM_OP
   static
 #endif
-  void _opRegGet(int idx, const char** name, fcomp_t* func, parseAttrs_t* parse) {
-    OpRegistry::get()->getOp(idx,name,func,parse);
+  void _opRegGet(int idx, const char** name,
+                 fcomp_t* func, parseAttrs_t* parse, inferType_t* type,
+                 inferShape_t* shape) {
+    OpRegistry::get()->getOp(idx,name,func,parse,type,shape);
   }
 }
 

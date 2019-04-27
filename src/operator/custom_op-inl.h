@@ -30,163 +30,129 @@
 
 namespace mxnet {
 namespace op {
-
-  class StringArray {
-  public:
-    char const** strings;
-    int size;
-    void alloc(int num) {
-      size = num;
-      strings = new char const*[size];
-    }
-    char const*& operator[](int idx) {
-      return strings[idx];
-    }
-    StringArray() {
-      strings = nullptr;
-      size = 0;
-    }
-    ~StringArray() {
-      if(!strings)
-        delete[] strings;
-    }
-  };
   
 struct CustomOpParam {
   std::string op_type;
-  StringArray keys;
-  StringArray vals;
+  std::vector<const char*> keys;
+  std::vector<const char*> vals;
+  int num_in, num_out;
+  CustomOp* op;
 };
 
 void AttrParser(NodeAttrs* attrs) {
-  std::cout << "in attr parser" << std::endl;
   attrs->parsed = CustomOpParam();
   CustomOpParam& params = nnvm::get<CustomOpParam>(attrs->parsed);
-  std::cout << "parsed" << std::endl;
+  //initialize num inputs/outputs
+  params.num_in = 0;
+  params.num_out = 0;
 
-  params.keys.alloc(attrs->dict.size()-1);
-  params.vals.alloc(attrs->dict.size()-1);
-  int idx=0;
+  //parse attrs
   for (auto& p : attrs->dict) {
     if (p.first == "op_type") {
       params.op_type = p.second;
     }
     else {
-      params.keys[idx] = p.first.c_str();
-      params.vals[idx++] = p.second.c_str();
+      params.keys.push_back(p.first.c_str());
+      params.vals.push_back(p.second.c_str());
     }
   }
-  
+
+  //check that op_type was specified, required
   CHECK(!params.op_type.empty()) << "Required argument `op_type` is missing.";
+  //check that operator has been registered
   CHECK(OpRegistry::get()->hasOp(params.op_type)) << "Cannot find custom operator '" << params.op_type << "'";
-  CustomOp *op = OpRegistry::get()->op(params.op_type);
-  CHECK(op->getParseAttrs()(params.keys.strings,params.vals.strings,idx)) << "Error parsing params for custom operator '" << params.op_type << "'";
-  /*
-
-  CHECK(creator(params.op_type.c_str(), keys.size(), keys.data(),
-                vals.data(), params.info.get()));
-
-  params.num_args = List<kCustomOpPropListArguments>(*attrs).size();
-  params.num_outs = List<kCustomOpPropListOutputs>(*attrs).size();
-  params.num_auxs = List<kCustomOpPropListAuxiliaryStates>(*attrs).size();
-
-  int num_dep, *rdeps, counter = 0;
-  std::vector<int> out_grad, in_data, out_data;
-  for (size_t i = 0; i < params.num_outs; ++i) out_grad.push_back(counter++);
-  for (size_t i = 0; i < params.num_args; ++i) in_data.push_back(counter++);
-  for (size_t i = 0; i < params.num_outs; ++i) out_data.push_back(counter++);
-  CHECK(reinterpret_cast<CustomOpBwdDepFunc>(
-    params.info->callbacks[kCustomOpPropDeclareBackwardDependency])(
-      out_grad.data(), in_data.data(), out_data.data(), &num_dep,
-      &rdeps, params.info->contexts[kCustomOpPropDeclareBackwardDependency]));
-  params.bwd_idx.insert(params.bwd_idx.end(), rdeps, rdeps+num_dep);
-  */
+  //get the op from registry
+  params.op = OpRegistry::get()->op(params.op_type);
+  //call parse attributes function
+  CHECK(params.op->getParseAttrs()(params.keys.data(),
+                            params.vals.data(),
+                            params.keys.size(),
+                            &params.num_in,
+                            &params.num_out)
+        ) << "Error parsing params for custom operator '" << params.op_type << "'";
 }
 
 bool InferType(const NodeAttrs& attrs,
                std::vector<int> *in_type,
                std::vector<int> *out_type) {
-  out_type[0] = in_type[0];
-  /*
-  const CustomParam& params = nnvm::get<CustomParam>(attrs.parsed);
+  std::cout << "inferring type..." << std::endl;
+  const CustomOpParam& params = nnvm::get<CustomOpParam>(attrs.parsed);
 
-  if (params.info->num_callbacks <= kCustomOpPropInferType) {
-    return ElemwiseAttr<int, type_is_none, type_assign, true, type_string>(
-        attrs, in_type, out_type, -1);
+  //prepare in/out types, by copying values
+  std::vector<int> intypes;
+  std::vector<int> outtypes;
+  for (size_t i = 0; i < params.num_in; ++i) {
+    intypes.push_back((*in_type)[i]);
   }
-
-  std::vector<int> types;
-  types.reserve(params.num_args + params.num_outs + params.num_auxs);
-  for (size_t i = 0; i < params.num_args; ++i) {
-    types.push_back((*in_type)[i]);
-  }
-  for (const auto& i : *out_type) {
-    types.push_back(i);
-  }
-  for (size_t i = 0; i < params.num_auxs; ++i) {
-    types.push_back((*in_type)[params.num_args+i]);
+  for (size_t i = 0; i < params.num_in; ++i) {
+    outtypes.push_back((*out_type)[i]);
   }
 
-  CHECK(reinterpret_cast<CustomOpInferTypeFunc>(
-      params.info->callbacks[kCustomOpPropInferType])(
-          types.size(), types.data(), params.info->contexts[kCustomOpPropInferType]));
+  //call infer types function
+  CHECK(params.op->getInferType()(params.keys.data(),
+                           params.vals.data(),
+                           params.keys.size(),
+                           intypes.data(),
+                           outtypes.data())
+        ) << "Error inferring types for custom operator '" << params.op_type << "'";
 
-  for (size_t i = 0; i < params.num_args; ++i) {
-    TYPE_ASSIGN_CHECK(*in_type, i, types[i]);
+  //check and assign types from custom op
+  for (size_t i = 0; i < params.num_in; ++i) {
+    TYPE_ASSIGN_CHECK(*in_type, i, intypes[i]);
   }
-  for (size_t i = 0; i < params.num_outs; ++i) {
-    TYPE_ASSIGN_CHECK(*out_type, i, types[params.num_args+i]);
+  for (size_t i = 0; i < params.num_out; ++i) {
+    TYPE_ASSIGN_CHECK(*out_type, i, outtypes[i]);
   }
-  for (size_t i = 0; i < params.num_auxs; ++i) {
-    TYPE_ASSIGN_CHECK(*in_type, params.num_args+i,
-                      types[params.num_args+params.num_outs+i]);
-  }
-  */
+  std::cout << "completed" << std::endl;  
   return true;
 }
 
  bool InferShape(const NodeAttrs& attrs,
                 mxnet::ShapeVector *in_shape,
                 mxnet::ShapeVector *out_shape) {
-   /*
-  const CustomParam& params = nnvm::get<CustomParam>(attrs.parsed);
+   CustomOpParam& params = (CustomOpParam&)nnvm::get<CustomOpParam>(attrs.parsed);
+  std::cout << "inferring shape..." << std::endl;
 
-  size_t total = params.num_args + params.num_outs + params.num_auxs;
-  std::vector<uint32_t*> shapes(total);
-  std::vector<int> ndims(total);
+  std::vector<uint32_t*> inshapes(params.num_in);
+  std::vector<int> indims(params.num_in);
+
   size_t buff_size = 0;
   for (const auto& i : *in_shape) buff_size += i.ndim();
-  std::vector<uint32_t> buff(buff_size);
-  uint32_t *ptr = buff.data();
+  std::vector<uint32_t> inbuff(buff_size);
+  uint32_t *ptr = inbuff.data();
   for (size_t i = 0; i < in_shape->size(); ++i) {
-    shapes[i] = ptr;
-    ndims[i] = (*in_shape)[i].ndim();
+    inshapes[i] = ptr;
+    indims[i] = (*in_shape)[i].ndim();
     for (size_t j = 0; j < (*in_shape)[i].ndim(); ++j, ++ptr) {
       *ptr = static_cast<uint32_t>((*in_shape)[i][j]);
     }
   }
 
-  CHECK(reinterpret_cast<CustomOpInferShapeFunc>(
-      params.info->callbacks[kCustomOpPropInferShape])(
-          shapes.size(), ndims.data(), shapes.data(),
-          params.info->contexts[kCustomOpPropInferShape]));
+  uint32_t** outshapes;
+  int* outdims;
+  CHECK(params.op->getInferShape()((mxAlloc_t)&(CustomOp::CallAllocator), params.op,
+                                   params.keys.data(), params.vals.data(), params.keys.size(),
+                                   inshapes.data(), indims.data(),
+                             &outshapes, &outdims)
+        ) << "Error inferring shapes for custom operator '" << params.op_type << "'";
 
-  for (size_t i = 0; i < params.num_args; ++i) {
-    SHAPE_ASSIGN_CHECK(*in_shape, i, mxnet::TShape(shapes[i], shapes[i]+ndims[i]));
+  std::vector<uint32_t*> out_shapes(params.num_out);
+  buff_size = 0;
+  for (int i=0; i<params.num_out; i++) buff_size += outdims[i];
+  std::vector<uint32_t> outbuff(buff_size);
+  ptr = outbuff.data();
+  for (size_t i = 0; i < params.num_out; ++i) {
+    out_shapes[i] = ptr;
+    for (size_t j = 0; j < outdims[i]; ++j, ++ptr) {
+      *ptr = static_cast<uint32_t>(outshapes[i][j]);
+    }
   }
 
-  size_t base = params.num_args;
-  for (size_t i = 0; i < params.num_outs; ++i) {
+  for (size_t i = 0; i < params.num_out; ++i) {
     SHAPE_ASSIGN_CHECK(*out_shape, i,
-        mxnet::TShape(shapes[base+i], shapes[base+i]+ndims[base+i]));
+        mxnet::TShape(out_shapes[i], out_shapes[i]+outdims[i]));
   }
 
-  base = params.num_args + params.num_outs;
-  for (size_t i = 0; i < params.num_auxs; ++i) {
-    SHAPE_ASSIGN_CHECK(*in_shape, params.num_args+i,
-        mxnet::TShape(shapes[base+i], shapes[base+i]+ndims[base+i]));
-  }
-  */
   return true;
 }
 
@@ -196,11 +162,31 @@ void Forward(const nnvm::NodeAttrs& attrs,
                    const std::vector<OpReqType>& req,
                    const std::vector<TBlob>& outputs) {
   const CustomOpParam& params = nnvm::get<CustomOpParam>(attrs.parsed);
+  fcomp_t fcomp = params.op->getFCompute();
 
-  fcomp_t fcomp = OpRegistry::get()->op(params.op_type)->getFCompute();
+  std::vector<void*> in_data, out_data;
+  std::vector<const long int*> in_shapes, out_shapes;
+  std::vector<int> in_dims, out_dims;
+  std::vector<int> in_types, out_types;
+  
+  for(int i=0; i<inputs.size(); i++) {
+    in_data.push_back(inputs[i].dptr_);
+    in_shapes.push_back(inputs[i].shape_.begin());
+    in_dims.push_back(inputs[i].shape_.ndim());
+    in_types.push_back(inputs[i].type_flag_);
+  }
+  
+  for(int i=0; i<outputs.size(); i++) {
+    out_data.push_back(outputs[i].dptr_);
+    out_shapes.push_back(outputs[i].shape_.begin());
+    out_dims.push_back(outputs[i].shape_.ndim());
+    out_types.push_back(outputs[i].type_flag_);
+  }
   
   std::cout << "Forward: " << params.op_type << std::endl;
-  fcomp(params.keys.strings,params.vals.strings,params.keys.size);
+  fcomp(params.keys.data(),params.vals.data(),params.keys.size(),
+        in_shapes.data(), in_dims.data(), in_data.data(), in_types.data(),
+        out_shapes.data(), out_dims.data(), out_data.data(), out_types.data());
 }
  
 }  // namespace op

@@ -113,18 +113,27 @@ int MXLoadCustomOpLib(const char* path) {
     char* name;
     fcomp_t fcomp = nullptr;
     parseAttrs_t parse = nullptr;
+    inferType_t type = nullptr;
+    inferShape_t shape = nullptr;
+    
     //get op
     get_op(i,&name,
-           (&fcomp),
-           (&parse));
+           &fcomp,
+           &parse,
+           &type,
+           &shape);
 
     CHECK(fcomp != nullptr) << "Error loading '" << name << "' custom op, FCompute function was not set.";
     CHECK(parse != nullptr) << "Error loading '" << name << "' custom op, ParseAttrs function was not set.";
+    CHECK(type != nullptr) << "Error loading '" << name << "' custom op, InferType function was not set.";
+    CHECK(shape != nullptr) << "Error loading '" << name << "' custom op, InferShape function was not set.";
     
     //register op
     OpRegistry::get()->add(name)
       .setFCompute(fcomp)
-      .setParseAttrs(parse);
+      .setParseAttrs(parse)
+      .setInferType(type)
+      .setInferShape(shape);
   }
 
   API_END();

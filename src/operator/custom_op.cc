@@ -33,15 +33,14 @@ CustomOp
 .set_attr<nnvm::FInferType>("FInferType", InferType)
 .set_attr<FCompute>("FCompute<cpu>", Forward)
 .set_num_inputs([](const NodeAttrs& attrs){
-    //const CustomParam& params = nnvm::get<CustomParam>(attrs.parsed);
-    //return params.num_args + params.num_auxs;
-    return 0;
+    const CustomOpParam& params = nnvm::get<CustomOpParam>(attrs.parsed);
+    return params.num_in;
   })
 .set_num_outputs([](const NodeAttrs& attrs){
-    //const CustomParam& params = nnvm::get<CustomParam>(attrs.parsed);
-    //return params.num_outs;
-    return 0;
+    const CustomOpParam& params = nnvm::get<CustomOpParam>(attrs.parsed);
+    return params.num_out;
   })
+.add_argument("data", "NDArray-or-Symbol[]", "Input data for the custom operator.")
 .add_argument("op_type", "string", "Name of the custom operator. ");
 
 }  // namespace op

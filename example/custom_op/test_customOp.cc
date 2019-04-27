@@ -60,11 +60,15 @@ int main() {
     char* name;
     fcomp_t fcomp = nullptr;
     parseAttrs_t parse = nullptr;
+    inferType_t infer = nullptr;
+    inferShape_t shape = nullptr;
     //get op
-    get_op(i,&name,&fcomp,&parse);
+    get_op(i,&name,&fcomp,&parse,&infer,&shape);
     std::cout << "got custom op: " << name << std::endl;
     //call fcompute function
-    (*fcomp)(nullptr,nullptr,0);
+    (*fcomp)(nullptr,nullptr,0,
+             nullptr,nullptr,nullptr,nullptr,
+             nullptr,nullptr,nullptr,nullptr);
   }
 
   return 0;
