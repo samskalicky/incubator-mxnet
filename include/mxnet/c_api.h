@@ -227,13 +227,11 @@ MXNET_DLL const char *MXGetLastError();
 //-------------------------------------
 
 /*!
- * \brief Get list of features supported on the runtime
- * \param libFeature pointer to array of LibFeature
- * \param size of the array
+ * \brief Load library of custom operators
+ * \param path is the location of the library to load
  * \return 0 when success, -1 when failure happens.
  */
 MXNET_DLL int MXLoadCustomOpLib(const char* path);
-MXNET_DLL int MXGetCustomOp(const char* path);
 
 /*!
  * \brief Get list of features supported on the runtime
