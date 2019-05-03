@@ -830,6 +830,7 @@ MXNET_DLL int MXNDArrayToDLPack(NDArrayHandle handle,
 */
 MXNET_DLL int MXNDArrayFromDLPack(DLManagedTensorHandle dlpack,
                                   NDArrayHandle *out_handle);
+
 /*!
  * \brief Delete a dlpack tensor
  * \param dlpack the pointer of the input DLManagedTensor
@@ -1176,14 +1177,7 @@ MXNET_DLL int MXInvokeCachedOpEx(CachedOpHandle handle,
                                  int *num_outputs,
                                  NDArrayHandle **outputs,
                                  const int** out_stypes);
-/*!
- * \brief invoke cached operator
- */
-MXNET_DLL int MXInvokeCachedOp(CachedOpHandle handle,
-                               int num_inputs,
-                               NDArrayHandle *inputs,
-                               int *num_outputs,
-                               NDArrayHandle **outputs);
+
 //--------------------------------------------
 // Part 3: symbolic configuration generation
 //--------------------------------------------
@@ -2078,7 +2072,6 @@ MXNET_DLL int MXExecutorReshapeEx(int partial_shaping,
  */
 MXNET_DLL int MXExecutorGetOptimizedSymbol(ExecutorHandle handle,
                                            SymbolHandle *out);
-
 /*!
  * \brief set a call back to notify the completion of operation
  */
@@ -2777,8 +2770,9 @@ MXNET_DLL int MXEnginePushAsync(EngineAsyncFunc async_func, void* func_param,
                                 EngineFuncParamDeleter deleter, ContextHandle ctx_handle,
                                 EngineVarHandle const_vars_handle, int num_const_vars,
                                 EngineVarHandle mutable_vars_handle, int num_mutable_vars,
-                                EngineFnPropertyHandle prop_handle = NULL, int priority = 0,
-                                const char* opr_name = NULL, bool wait = false);
+                                EngineFnPropertyHandle prop_handle DEFAULT(NULL),
+                                int priority DEFAULT(0), const char* opr_name DEFAULT(NULL),
+                                bool wait DEFAULT(false));
 
 /*!
   * \brief Push a synchronous operation to the engine.
@@ -2799,8 +2793,8 @@ MXNET_DLL int MXEnginePushSync(EngineSyncFunc sync_func, void* func_param,
                                EngineFuncParamDeleter deleter, ContextHandle ctx_handle,
                                EngineVarHandle const_vars_handle, int num_const_vars,
                                EngineVarHandle mutable_vars_handle, int num_mutable_vars,
-                               EngineFnPropertyHandle prop_handle = NULL, int priority = 0,
-                               const char* opr_name = NULL);
+                               EngineFnPropertyHandle prop_handle DEFAULT(NULL),
+                               int priority DEFAULT(0), const char* opr_name DEFAULT(NULL));
 
 #ifdef __cplusplus
 }
