@@ -65,10 +65,12 @@ int main() {
     //get op
     get_op(i,&name,&fcomp,&parse,&infer,&shape);
     std::cout << "got custom op: " << name << std::endl;
+
+    std::map<std::string,std::string> attrs;
+    std::vector<MXTensor> inputs;
+    std::vector<MXTensor> outputs;
     //call fcompute function
-    (*fcomp)(nullptr,nullptr,0,
-             nullptr,nullptr,nullptr,nullptr,
-             nullptr,nullptr,nullptr,nullptr);
+    (*fcomp)(attrs,inputs,outputs);
   }
 
   return 0;

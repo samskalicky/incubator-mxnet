@@ -93,7 +93,8 @@ inline int MXAPIGetFunctionRegInfo(const FunRegType *e,
 
 int MXLoadCustomOpLib(const char* path) {
   API_BEGIN();
-
+  OpRegistry* reg = OpRegistry::get();
+  
   //load library
   void *lib = load_lib(path);
   CHECK(lib) << "Error loading library";
@@ -103,6 +104,16 @@ int MXLoadCustomOpLib(const char* path) {
   get_func(lib, (void_ptr)(&get_size), (char*)"_opRegSize");
   CHECK(get_size) << "Error getting get_size function from library";
 
+  //get pointers to call op functions
+  get_func(lib, (void_ptr)(&(reg->_callParseAttrs)), (char*)"_opCallParseAttrs");
+  CHECK(reg->_callParseAttrs) << "Error getting _opCallParseAttrs function from library";
+  get_func(lib, (void_ptr)(&(reg->_callInferType)), (char*)"_opCallInferType");
+  CHECK(reg->_callInferType) << "Error getting _callInferType function from library";
+  get_func(lib, (void_ptr)(&(reg->_callInferShape)), (char*)"_opCallInferShape");
+  CHECK(reg->_callInferShape) << "Error getting _callInferShape function from library";
+  get_func(lib, (void_ptr)(&(reg->_callFCompute)), (char*)"_opCallFCompute");
+  CHECK(reg->_callFCompute) << "Error getting _callFCompute function from library";
+  
   //get pointer to function to get op from lib
   get_op_t get_op;
   get_func(lib, (void_ptr)(&get_op), (char*)"_opRegGet");
@@ -129,7 +140,7 @@ int MXLoadCustomOpLib(const char* path) {
     CHECK(shape != nullptr) << "Error loading '" << name << "' custom op, InferShape function was not set.";
     
     //register op
-    OpRegistry::get()->add(name)
+    reg->add(name)
       .setFCompute(fcomp)
       .setParseAttrs(parse)
       .setInferType(type)

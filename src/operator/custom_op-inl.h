@@ -64,18 +64,18 @@ void AttrParser(NodeAttrs* attrs) {
   //get the op from registry
   params.op = OpRegistry::get()->op(params.op_type);
   //call parse attributes function
-  CHECK(params.op->getParseAttrs()(params.keys.data(),
-                            params.vals.data(),
-                            params.keys.size(),
-                            &params.num_in,
-                            &params.num_out)
+  CHECK(OpRegistry::get()->_callParseAttrs(params.op_type.c_str(),
+                                           params.keys.data(),
+                                           params.vals.data(),
+                                           params.keys.size(),
+                                           &params.num_in,
+                                           &params.num_out)
         ) << "Error parsing params for custom operator '" << params.op_type << "'";
 }
 
 bool InferType(const NodeAttrs& attrs,
                std::vector<int> *in_type,
                std::vector<int> *out_type) {
-  std::cout << "inferring type..." << std::endl;
   const CustomOpParam& params = nnvm::get<CustomOpParam>(attrs.parsed);
 
   //prepare in/out types, by copying values
@@ -89,11 +89,14 @@ bool InferType(const NodeAttrs& attrs,
   }
 
   //call infer types function
-  CHECK(params.op->getInferType()(params.keys.data(),
-                           params.vals.data(),
-                           params.keys.size(),
-                           intypes.data(),
-                           outtypes.data())
+  CHECK(OpRegistry::get()->_callInferType(params.op_type.c_str(),
+                                          params.keys.data(),
+                                          params.vals.data(),
+                                          params.keys.size(),
+                                          intypes.data(),
+                                          intypes.size(),
+                                          outtypes.data(),
+                                          outtypes.size())
         ) << "Error inferring types for custom operator '" << params.op_type << "'";
 
   //check and assign types from custom op
@@ -103,7 +106,7 @@ bool InferType(const NodeAttrs& attrs,
   for (size_t i = 0; i < params.num_out; ++i) {
     TYPE_ASSIGN_CHECK(*out_type, i, outtypes[i]);
   }
-  std::cout << "completed" << std::endl;  
+
   return true;
 }
 
@@ -111,7 +114,6 @@ bool InferType(const NodeAttrs& attrs,
                 mxnet::ShapeVector *in_shape,
                 mxnet::ShapeVector *out_shape) {
    CustomOpParam& params = (CustomOpParam&)nnvm::get<CustomOpParam>(attrs.parsed);
-  std::cout << "inferring shape..." << std::endl;
 
   std::vector<uint32_t*> inshapes(params.num_in);
   std::vector<int> indims(params.num_in);
@@ -128,17 +130,28 @@ bool InferType(const NodeAttrs& attrs,
     }
   }
 
-  uint32_t** outshapes;
-  int* outdims;
-  CHECK(params.op->getInferShape()((mxAlloc_t)&(CustomOp::CallAllocator), params.op,
-                                   params.keys.data(), params.vals.data(), params.keys.size(),
-                                   inshapes.data(), indims.data(),
-                             &outshapes, &outdims)
+  uint32_t** outshapes = nullptr;
+  int* outdims = nullptr;
+  CHECK(OpRegistry::get()->_callInferShape((mxAlloc_t)&(CustomOp::CallAllocator),
+                                          params.op,
+                                          params.op_type.c_str(),
+                                          params.keys.data(),
+                                          params.vals.data(),
+                                          params.keys.size(),
+                                          inshapes.data(),
+                                          indims.data(),
+                                          params.num_in,
+                                          &outshapes,
+                                          &outdims,
+                                          params.num_out)
         ) << "Error inferring shapes for custom operator '" << params.op_type << "'";
 
   std::vector<uint32_t*> out_shapes(params.num_out);
   buff_size = 0;
-  for (int i=0; i<params.num_out; i++) buff_size += outdims[i];
+  for (int i=0; i<params.num_out; i++) {
+    buff_size += outdims[i];
+  }
+
   std::vector<uint32_t> outbuff(buff_size);
   ptr = outbuff.data();
   for (size_t i = 0; i < params.num_out; ++i) {
@@ -183,10 +196,21 @@ void Forward(const nnvm::NodeAttrs& attrs,
     out_types.push_back(outputs[i].type_flag_);
   }
   
-  std::cout << "Forward: " << params.op_type << std::endl;
-  fcomp(params.keys.data(),params.vals.data(),params.keys.size(),
-        in_shapes.data(), in_dims.data(), in_data.data(), in_types.data(),
-        out_shapes.data(), out_dims.data(), out_data.data(), out_types.data());
+  CHECK(OpRegistry::get()->_callFCompute(params.op_type.c_str(),
+                                         params.keys.data(),
+                                         params.vals.data(),
+                                         params.keys.size(),
+                                         in_shapes.data(),
+                                         in_dims.data(),
+                                         in_data.data(),
+                                         in_types.data(),
+                                         params.num_in,
+                                         out_shapes.data(),
+                                         out_dims.data(),
+                                         out_data.data(),
+                                         out_types.data(),
+                                         params.num_out)
+        ) << "Error calling FCompute for custom operator '" << params.op_type << "'";
 }
  
 }  // namespace op

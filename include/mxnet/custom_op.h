@@ -19,35 +19,48 @@ enum MXDType {
 };
 
 struct MXTensor {
-  MXTensor() { data = nullptr; };
-MXTensor(void *data, const std::vector<int64_t> &shape, MXDType dtype)
-: data{data}, shape{shape}, dtype{dtype} {}
+  MXTensor() { data = nullptr; }
+  MXTensor(void *data, const std::vector<int64_t> &shape, MXDType dtype)
+  : data{data}, shape{shape}, dtype{dtype} {}
+
+  template<typename data_type>
+  data_type* getData() {
+    return (data_type*)data;
+  }
   
   void *data; // not owned
   std::vector<int64_t> shape;
   MXDType dtype;
 };
 
+//User function templates
+typedef int (*fcomp_t)(std::map<std::string,std::string>,
+                        std::vector<MXTensor>, std::vector<MXTensor>);                        
+typedef int (*parseAttrs_t)(std::map<std::string,std::string>,
+                            int*, int*);
+typedef int (*inferType_t)(std::map<std::string,std::string>,
+                           std::vector<int>&, std::vector<int>&);
+typedef int (*inferShape_t)(std::map<std::string,std::string>,
+                            std::vector<std::vector<unsigned int>>&,
+                            std::vector<std::vector<unsigned int>>&);
+
+//internal function templates
 typedef void (*void_t)(void);
 typedef void_t* void_ptr;
-
 typedef void* (*mxAlloc_t)(void*, unsigned);
-
-typedef void (*fcomp_t)(const char* const*, const char* const*, int,
-                        const long int**, int*, void**, int*,
-                        const long int**, int*, void**, int*);
-                        
-typedef int (*parseAttrs_t)(const char* const*, const char* const*, int,
-                            int*, int*);
-typedef int (*inferType_t)(const char* const*, const char* const*, int,
-                            int*, int*);
-typedef int (*inferShape_t)(mxAlloc_t, void*,
-                            const char* const*, const char* const*, int,
-                            unsigned int**, int*, unsigned int***, int**);
-
 typedef int (*get_size_t)(void);
 typedef void (*get_op_t)(int, char**, fcomp_t*, parseAttrs_t*, inferType_t*,
                          inferShape_t*);
+typedef int (*call_fcomp)(const char*, const char* const*, const char* const*, int,
+                           const long int**, int*, void**, int*, int,
+                           const long int**, int*, void**, int*, int);
+typedef int (*call_parseAttrs)(const char*, const char* const*, const char* const*, int,
+                                int*, int*);
+typedef int (*call_inferType)(const char*, const char* const*, const char* const*, int,
+                               int*, int, int*, int);
+typedef int (*call_inferShape)(mxAlloc_t, void*,
+                                const char*, const char* const*, const char* const*, int,
+                                unsigned int**, int*, int, unsigned int***, int**, int);
 
 class CustomOp {
  public:
@@ -66,8 +79,7 @@ class CustomOp {
       free(ptr);
     }
   }
-
-  
+ 
   CustomOp& setFCompute(fcomp_t fcomp) {
     fcompute = fcomp;
     return *this;
@@ -151,11 +163,22 @@ class OpRegistry {
     return entries[name];
   }
 
+  call_parseAttrs _callParseAttrs;
+  call_inferType _callInferType;
+  call_inferShape _callInferShape;
+  call_fcomp _callFCompute;
+  
  private:
   std::map<std::string,CustomOp*> entries;
   std::vector<std::string> names;
   /*! \brief constructor */
-  OpRegistry() {}
+  OpRegistry() {
+    _callParseAttrs = nullptr;
+    _callInferType = nullptr;
+    _callInferShape = nullptr;
+    _callFCompute = nullptr;
+  
+  }
   /*! \brief destructor */
   ~OpRegistry() {}
 };
@@ -176,8 +199,138 @@ extern "C" {
                  inferShape_t* shape) {
     OpRegistry::get()->getOp(idx,name,func,parse,type,shape);
   }
-}
 
+#ifndef MXNET_CUSTOM_OP
+  static
+#endif
+  int _opCallFCompute(const char* name, const char* const* keys, const char* const* vals, int num,
+                       const long int** inshapes, int* indims, void** indata, int* intypes, int num_in,
+                       const long int** outshapes, int* outdims, void** outdata, int* outtypes, int num_out) {
+    CustomOp* op = OpRegistry::get()->op(name);
+
+    //create map of attributes from list
+    std::map<std::string,std::string> attrs;
+    for(int i=0; i<num; i++) {
+      attrs[std::string(keys[i])] = std::string(vals[i]);
+    }
+
+    //create a vector of tensors for inputs
+    std::vector<MXTensor> inputs(num_in);
+    for(int i=0; i<num_in; i++) {
+      inputs[i].data = indata[i];
+      inputs[i].dtype = (MXDType)intypes[i];
+      for(int j=0; j<indims[i]; j++) {
+        inputs[i].shape.push_back(inshapes[i][j]);
+      }
+    }
+
+    //create a vector of tensors for outputs
+    std::vector<MXTensor> outputs(num_out);
+    for(int i=0; i<num_out; i++) {
+      outputs[i].data = outdata[i];
+      outputs[i].dtype = (MXDType)outtypes[i];
+      for(int j=0; j<outdims[i]; j++) {
+        outputs[i].shape.push_back(outshapes[i][j]);
+      }
+    }
+
+    return op->getFCompute()(attrs,inputs,outputs);
+  }
+
+
+#ifndef MXNET_CUSTOM_OP
+  static
+#endif
+  int _opCallParseAttrs(const char* name, const char* const* keys, const char* const* vals, int num,
+                         int* num_in, int* num_out) {
+    CustomOp* op = OpRegistry::get()->op(name);
+
+    //create map of attributes from list
+    std::map<std::string,std::string> attrs;
+    for(int i=0; i<num; i++) {
+      attrs[std::string(keys[i])] = std::string(vals[i]);
+    }
+
+    return op->getParseAttrs()(attrs,num_in,num_out);
+  }
+
+#ifndef MXNET_CUSTOM_OP
+  static
+#endif
+  int _opCallInferType(const char* name, const char* const* keys, const char* const* vals, int num,
+                        int* intypes, int num_in, int* outtypes, int num_out) {
+    CustomOp* op = OpRegistry::get()->op(name);
+
+    //create map of attributes from list
+    std::map<std::string,std::string> attrs;
+    for(int i=0; i<num; i++) {
+      attrs[std::string(keys[i])] = std::string(vals[i]);
+    }
+
+    //create vector of types, copy input types, output types are empty
+    std::vector<int> in_types(num_in);
+    std::vector<int> out_types(num_out);
+    for(int i=0; i<num_in; i++) {
+      in_types[i] = intypes[i];
+    }
+
+    int retval = op->getInferType()(attrs,in_types,out_types);
+    if(!retval) return retval;
+
+    //copy output types
+    for(int i=0; i<num_out; i++) {
+      outtypes[i] = out_types[i];
+    }
+
+    return retval;
+  }
+
+#ifndef MXNET_CUSTOM_OP
+  static
+#endif
+  int _opCallInferShape(mxAlloc_t mx_alloc, void* ptr,
+                         const char* name, const char* const* keys, const char* const* vals, int num,
+                         unsigned int** inshapes, int* indims, int num_in,
+                         unsigned int*** outshapes, int** outdims, int num_out) {
+    CustomOp* op = OpRegistry::get()->op(name);
+
+    //create map of attributes from list
+    std::map<std::string,std::string> attrs;
+    for(int i=0; i<num; i++) {
+      attrs[std::string(keys[i])] = std::string(vals[i]);
+    }
+
+    //create a vector of shapes for inputs
+    std::vector<std::vector<unsigned int> > in_shapes(num_in);
+    for(int i=0; i<num_in; i++) {
+      for(int j=0; j<indims[i]; j++) {
+        in_shapes[i].push_back(inshapes[i][j]);
+      }
+    }
+
+    //create a vector of shapes for outputs
+    std::vector<std::vector<unsigned int> > out_shapes(num_out);
+
+    int retval = op->getInferShape()(attrs,in_shapes,out_shapes);
+    if(!retval) return retval;
+
+    //allocate space for output dims, shape
+    *outdims = (int*)mx_alloc(ptr,num_out*sizeof(int));
+    *outshapes = (unsigned**)mx_alloc(ptr,num_out*sizeof(unsigned*));
+
+    //copy output shapes
+    for(int i=0; i<num_out; i++) {
+      (*outdims)[i] = out_shapes[i].size();
+      (*outshapes)[i] = (unsigned*)mx_alloc(ptr,(*outdims)[i]*sizeof(unsigned));
+      for(int j=0; j<indims[i]; j++) {
+        (*outshapes)[i][j] = out_shapes[i][j];
+      }
+    }
+
+    return retval;
+  }
+  
+} //end extern "C"
 /*********************************************************************************/
 
 /*********************************************************************************/

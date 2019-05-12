@@ -7,21 +7,31 @@
 #define NUM_OUT 1
 
 //User code
-void myFCompute(const char* const* keys, const char* const* vals, int num,
-                const long int** inshapes, int* indims, void** indata, int* intypes,
-                const long int** outshapes, int* outdims, void** outdata, int* outtypes) {
-  std::cout << "called myFCompute with " << num << " attrs" << std::endl;
+int myFCompute(std::map<std::string,std::string> attrs,
+               std::vector<MXTensor> inputs, std::vector<MXTensor> outputs) {
+  std::cout << "called myFCompute with :" << std::endl;
+  std::cout << "\tattrs:    " << attrs.size() << std::endl;
+  std::cout << "\tinputs:   " << inputs.size() << std::endl;
+  std::cout << "\toutputs:  " << outputs.size() << std::endl;
+
+  for(int i=0; i<NUM_OUT; i++) {
+    int64_t cnt=0;
+    for(int j=0; j<inputs[i].shape.size(); j++) {
+      for(int k=0; k<inputs[i].shape[j]; k++) {
+        outputs[i].getData<float>()[cnt] = inputs[i].getData<float>()[cnt] + 42;
+        cnt++;
+      }
+    }
+  }
+  
+  return 1; //no error
 }
 
-int parseAttrs(const char* const* keys, const char* const* vals, int num,
+int parseAttrs(std::map<std::string,std::string> attrs,
                int* num_in, int* num_out) {
   std::cout << "parse attrs" << std::endl;
-  std::map<std::string,std::string> params;
-  for(int i=0; i<num; i++) {
-    params[std::string(keys[i])]=std::string(vals[i]);
-  }
 
-  if(params.find("myParam") == params.end()) {
+  if(attrs.find("myParam") == attrs.end()) {
     std::cout << "Missing param 'myParam'" << std::endl;
     return 0;
   }
@@ -29,34 +39,30 @@ int parseAttrs(const char* const* keys, const char* const* vals, int num,
   *num_in = NUM_IN;
   *num_out = NUM_OUT;
   
-  return 1;
+  return 1; //no error
 }
 
-int inferType(const char* const* keys, const char* const* vals, int num,
-               int* intypes, int* outtypes) {
+int inferType(std::map<std::string,std::string> attrs, std::vector<int> &intypes,
+              std::vector<int> &outtypes) {
   std::cout << "infer type" << std::endl;
   for(int i=0; i<NUM_IN; i++) {
     outtypes[i] = intypes[i];
   }
   
-  return 1;
+  return 1; //no error
 }
 
-int inferShape(mxAlloc_t mx_alloc, void* ptr, const char* const* keys, const char* const* vals, int num,
-               unsigned int** inshapes, int* indims, unsigned int*** outshapes, int** outdims) {
+int inferShape(std::map<std::string,std::string> attrs, std::vector<std::vector<unsigned int>> &inshapes,
+               std::vector<std::vector<unsigned int>> &outshapes) {
   std::cout << "infer shape" << std::endl;
-  *outdims = (int*)mx_alloc(ptr,NUM_OUT*sizeof(int));
-  *outshapes = (unsigned**)mx_alloc(ptr,NUM_OUT*sizeof(unsigned*));
 
   for(int i=0; i<NUM_OUT; i++) {
-    (*outdims)[i] = indims[i];
-    (*outshapes)[i] = (unsigned*)mx_alloc(ptr,indims[i]*sizeof(unsigned));
-    for(int j=0; j<indims[i]; j++) {
-      (*outshapes)[i][j] = inshapes[i][j];
+    for(int j=0; j<inshapes[i].size(); j++) {
+      outshapes[i].push_back(inshapes[i][j]);
     }
   }
-  
-  return 1;
+
+  return 1; //no error
 }
 
 //Register Op
