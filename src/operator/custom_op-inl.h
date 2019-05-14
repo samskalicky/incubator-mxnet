@@ -178,20 +178,20 @@ void Forward(const nnvm::NodeAttrs& attrs,
   fcomp_t fcomp = params.op->getFCompute();
 
   std::vector<void*> in_data, out_data;
-  std::vector<const long int*> in_shapes, out_shapes;
+  std::vector<const long long *> in_shapes, out_shapes;
   std::vector<int> in_dims, out_dims;
   std::vector<int> in_types, out_types;
   
   for(int i=0; i<inputs.size(); i++) {
     in_data.push_back(inputs[i].dptr_);
-    in_shapes.push_back(inputs[i].shape_.begin());
+    in_shapes.push_back(inputs[i].shape_.data());
     in_dims.push_back(inputs[i].shape_.ndim());
     in_types.push_back(inputs[i].type_flag_);
   }
   
   for(int i=0; i<outputs.size(); i++) {
     out_data.push_back(outputs[i].dptr_);
-    out_shapes.push_back(outputs[i].shape_.begin());
+    out_shapes.push_back(outputs[i].shape_.data());
     out_dims.push_back(outputs[i].shape_.ndim());
     out_types.push_back(outputs[i].type_flag_);
   }
