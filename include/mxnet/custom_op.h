@@ -4,6 +4,7 @@
 #include <string>
 #include <functional>
 
+#include <stdint.h>
 
 #ifndef _MXNET_CUSTOM_OP_H_
 #define _MXNET_CUSTOM_OP_H_
@@ -52,8 +53,8 @@ typedef int (*get_size_t)(void);
 typedef void (*get_op_t)(int, char**, fcomp_t*, parseAttrs_t*, inferType_t*,
                          inferShape_t*);
 typedef int (*call_fcomp)(const char*, const char* const*, const char* const*, int,
-                           const long long**, int*, void**, int*, int,
-                           const long long**, int*, void**, int*, int);
+                           const int64_t**, int*, void**, int*, int,
+                           const int64_t**, int*, void**, int*, int);
 typedef int (*call_parseAttrs)(const char*, const char* const*, const char* const*, int,
                                 int*, int*);
 typedef int (*call_inferType)(const char*, const char* const*, const char* const*, int,
@@ -204,8 +205,8 @@ extern "C" {
   static
 #endif
   int _opCallFCompute(const char* name, const char* const* keys, const char* const* vals, int num,
-                       const long long** inshapes, int* indims, void** indata, int* intypes, int num_in,
-                       const long long** outshapes, int* outdims, void** outdata, int* outtypes, int num_out) {
+                       const int64_t** inshapes, int* indims, void** indata, int* intypes, int num_in,
+                       const int64_t** outshapes, int* outdims, void** outdata, int* outtypes, int num_out) {
     CustomOp* op = OpRegistry::get()->op(name);
 
     //create map of attributes from list

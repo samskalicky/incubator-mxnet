@@ -178,7 +178,7 @@ void Forward(const nnvm::NodeAttrs& attrs,
   fcomp_t fcomp = params.op->getFCompute();
 
   std::vector<void*> in_data, out_data;
-  std::vector<const long long *> in_shapes, out_shapes;
+  std::vector<const int64_t *> in_shapes, out_shapes;
   std::vector<int> in_dims, out_dims;
   std::vector<int> in_types, out_types;
   
