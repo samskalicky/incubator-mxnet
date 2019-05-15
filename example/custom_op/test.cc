@@ -67,7 +67,7 @@ int inferShape(std::map<std::string,std::string> attrs, std::vector<std::vector<
 
 //Register Op
 REGISTER_OP(sam)
-.setFCompute(myFCompute)
+.setFCompute_cpu(myFCompute)
 .setParseAttrs(parseAttrs)
 .setInferType(inferType)
 .setInferShape(inferShape);

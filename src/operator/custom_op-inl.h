@@ -176,12 +176,13 @@ bool InferType(const NodeAttrs& attrs,
   return true;
 }
 
-void Forward(const nnvm::NodeAttrs& attrs,
+void Forward_cpu(const nnvm::NodeAttrs& attrs,
                    const OpContext& ctx,
                    const std::vector<TBlob>& inputs,
                    const std::vector<OpReqType>& req,
                    const std::vector<TBlob>& outputs) {
   const CustomOpParam& params = nnvm::get<CustomOpParam>(attrs.parsed);
+  CHECK(params.op->getFCompute_cpu()) << "Error! Custom operator '" << params.op_type << "' does not support CPU forward";
 
   std::vector<void*> in_data, out_data;
   std::vector<const int64_t *> in_shapes, out_shapes;
@@ -202,7 +203,7 @@ void Forward(const nnvm::NodeAttrs& attrs,
     out_types.push_back(outputs[i].type_flag_);
   }
   
-  CHECK(OpRegistry::get()->_callFCompute(params.op_type.c_str(),
+  CHECK(OpRegistry::get()->_callFCompute_cpu(params.op_type.c_str(),
                                          params.keys.data(),
                                          params.vals.data(),
                                          params.keys.size(),
@@ -216,7 +217,51 @@ void Forward(const nnvm::NodeAttrs& attrs,
                                          out_data.data(),
                                          out_types.data(),
                                          params.num_out)
-        ) << "Error calling FCompute for custom operator '" << params.op_type << "'";
+        ) << "Error calling CPU FCompute for custom operator '" << params.op_type << "'";
+}
+
+void Forward_gpu(const nnvm::NodeAttrs& attrs,
+                   const OpContext& ctx,
+                   const std::vector<TBlob>& inputs,
+                   const std::vector<OpReqType>& req,
+                   const std::vector<TBlob>& outputs) {
+  const CustomOpParam& params = nnvm::get<CustomOpParam>(attrs.parsed);
+  CHECK(params.op->getFCompute_gpu()) << "Error! Custom operator '" << params.op_type << "' does not support GPU forward";
+
+  std::vector<void*> in_data, out_data;
+  std::vector<const int64_t *> in_shapes, out_shapes;
+  std::vector<int> in_dims, out_dims;
+  std::vector<int> in_types, out_types;
+  
+  for(size_t i=0; i<inputs.size(); i++) {
+    in_data.push_back(inputs[i].dptr_);
+    in_shapes.push_back(inputs[i].shape_.data());
+    in_dims.push_back(inputs[i].shape_.ndim());
+    in_types.push_back(inputs[i].type_flag_);
+  }
+  
+  for(size_t i=0; i<outputs.size(); i++) {
+    out_data.push_back(outputs[i].dptr_);
+    out_shapes.push_back(outputs[i].shape_.data());
+    out_dims.push_back(outputs[i].shape_.ndim());
+    out_types.push_back(outputs[i].type_flag_);
+  }
+  
+  CHECK(OpRegistry::get()->_callFCompute_gpu(params.op_type.c_str(),
+                                         params.keys.data(),
+                                         params.vals.data(),
+                                         params.keys.size(),
+                                         in_shapes.data(),
+                                         in_dims.data(),
+                                         in_data.data(),
+                                         in_types.data(),
+                                         params.num_in,
+                                         out_shapes.data(),
+                                         out_dims.data(),
+                                         out_data.data(),
+                                         out_types.data(),
+                                         params.num_out)
+        ) << "Error calling GPU FCompute for custom operator '" << params.op_type << "'";
 }
  
 }  // namespace op

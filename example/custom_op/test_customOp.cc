@@ -58,19 +58,20 @@ int main() {
   int num_ops = get_size();
   for(int i=0; i<num_ops; i++) {
     char* name;
-    fcomp_t fcomp = nullptr;
+    fcomp_t cpufcomp = nullptr;
+    fcomp_t gpufcomp = nullptr;
     parseAttrs_t parse = nullptr;
     inferType_t infer = nullptr;
     inferShape_t shape = nullptr;
     //get op
-    get_op(i,&name,&fcomp,&parse,&infer,&shape);
+    get_op(i,&name,&cpufcomp,&gpufcomp,&parse,&infer,&shape);
     std::cout << "got custom op: " << name << std::endl;
 
     std::map<std::string,std::string> attrs;
     std::vector<MXTensor> inputs;
     std::vector<MXTensor> outputs;
     //call fcompute function
-    (*fcomp)(attrs,inputs,outputs);
+    (*cpufcomp)(attrs,inputs,outputs);
   }
 
   return 0;

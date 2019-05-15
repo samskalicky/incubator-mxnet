@@ -31,7 +31,8 @@ CustomOp
 .set_attr_parser(AttrParser)
 .set_attr<mxnet::FInferShape>("FInferShape", InferShape)
 .set_attr<nnvm::FInferType>("FInferType", InferType)
-.set_attr<FCompute>("FCompute<cpu>", Forward)
+.set_attr<FCompute>("FCompute<cpu>", Forward_cpu)
+.set_attr<FCompute>("FCompute<gpu>", Forward_gpu)
 .set_num_inputs([](const NodeAttrs& attrs){
     const CustomOpParam& params = nnvm::get<CustomOpParam>(attrs.parsed);
     return params.num_in;

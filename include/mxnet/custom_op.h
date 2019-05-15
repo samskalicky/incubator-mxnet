@@ -50,7 +50,7 @@ typedef void (*void_t)(void);
 typedef void_t* void_ptr;
 typedef void* (*mxAlloc_t)(void*, unsigned);
 typedef int (*get_size_t)(void);
-typedef void (*get_op_t)(int, char**, fcomp_t*, parseAttrs_t*, inferType_t*,
+typedef void (*get_op_t)(int, char**, fcomp_t*, fcomp_t*, parseAttrs_t*, inferType_t*,
                          inferShape_t*);
 typedef int (*call_fcomp)(const char*, const char* const*, const char* const*, int,
                            const int64_t**, int*, void**, int*, int,
@@ -88,8 +88,12 @@ class CustomOp {
     allocations.clear();
   }
  
-  CustomOp& setFCompute(fcomp_t fcomp) {
-    fcompute = fcomp;
+  CustomOp& setFCompute_cpu(fcomp_t fcomp) {
+    cpu_fcompute = fcomp;
+    return *this;
+  }
+  CustomOp& setFCompute_gpu(fcomp_t fcomp) {
+    gpu_fcompute = fcomp;
     return *this;
   }
   CustomOp& setParseAttrs(parseAttrs_t func) {
@@ -113,14 +117,18 @@ class CustomOp {
   parseAttrs_t getParseAttrs() {
     return parse_attrs;
   }
-  fcomp_t getFCompute() {
-    return fcompute;
+  fcomp_t getFCompute_cpu() {
+    return cpu_fcompute;
+  }
+  fcomp_t getFCompute_gpu() {
+    return gpu_fcompute;
   }
   const char* getName() {
     return name;
   }
  CustomOp(const char* op_name) : name(op_name) {
-    fcompute = nullptr;
+    cpu_fcompute = nullptr;
+    gpu_fcompute = nullptr;
     parse_attrs = nullptr;
     infer_type = nullptr;
     infer_shape = nullptr;
@@ -131,7 +139,7 @@ class CustomOp {
   inferShape_t infer_shape;
   inferType_t infer_type;
   parseAttrs_t parse_attrs;
-  fcomp_t fcompute;
+  fcomp_t cpu_fcompute, gpu_fcompute;
   const char* name;
 };
 
@@ -151,12 +159,13 @@ class OpRegistry {
     return entries.size();
   }
   void getOp(int idx, const char** name,
-             fcomp_t* func, parseAttrs_t* parse, inferType_t *type,
+             fcomp_t* cpufunc, fcomp_t* gpufunc, parseAttrs_t* parse, inferType_t *type,
              inferShape_t* shape) {
     std::string op_name = names[idx];
     CustomOp* op = entries[op_name];
     *name = op->getName();
-    *func = op->getFCompute();
+    *cpufunc = op->getFCompute_cpu();
+    *gpufunc = op->getFCompute_gpu();
     *parse = op->getParseAttrs();
     *type = op->getInferType();
     *shape = op->getInferShape();
@@ -174,7 +183,7 @@ class OpRegistry {
   call_parseAttrs _callParseAttrs;
   call_inferType _callInferType;
   call_inferShape _callInferShape;
-  call_fcomp _callFCompute;
+  call_fcomp _callFCompute_cpu, _callFCompute_gpu;
   
  private:
   std::map<std::string,CustomOp*> entries;
@@ -184,8 +193,8 @@ class OpRegistry {
     _callParseAttrs = nullptr;
     _callInferType = nullptr;
     _callInferShape = nullptr;
-    _callFCompute = nullptr;
-  
+    _callFCompute_cpu = nullptr;
+    _callFCompute_gpu = nullptr;
   }
   /*! \brief destructor */
   ~OpRegistry() {}
@@ -203,15 +212,15 @@ extern "C" {
   static inline
 #endif
   void _opRegGet(int idx, const char** name,
-                 fcomp_t* func, parseAttrs_t* parse, inferType_t* type,
+                 fcomp_t* cpufunc, fcomp_t* gpufunc, parseAttrs_t* parse, inferType_t* type,
                  inferShape_t* shape) {
-    OpRegistry::get()->getOp(idx,name,func,parse,type,shape);
+    OpRegistry::get()->getOp(idx,name,cpufunc,gpufunc,parse,type,shape);
   }
 
 #ifndef MXNET_CUSTOM_OP
   static inline
 #endif
-  int _opCallFCompute(const char* name, const char* const* keys, const char* const* vals, int num,
+  int _opCallFCompute_cpu(const char* name, const char* const* keys, const char* const* vals, int num,
                        const int64_t** inshapes, int* indims, void** indata, int* intypes, int num_in,
                        const int64_t** outshapes, int* outdims, void** outdata, int* outtypes, int num_out) {
     CustomOp* op = OpRegistry::get()->op(name);
@@ -242,9 +251,45 @@ extern "C" {
       }
     }
 
-    return op->getFCompute()(attrs,inputs,outputs);
+    return op->getFCompute_cpu()(attrs,inputs,outputs);
   }
 
+#ifndef MXNET_CUSTOM_OP
+  static inline
+#endif
+  int _opCallFCompute_gpu(const char* name, const char* const* keys, const char* const* vals, int num,
+                       const int64_t** inshapes, int* indims, void** indata, int* intypes, int num_in,
+                       const int64_t** outshapes, int* outdims, void** outdata, int* outtypes, int num_out) {
+    CustomOp* op = OpRegistry::get()->op(name);
+
+    //create map of attributes from list
+    std::map<std::string,std::string> attrs;
+    for(int i=0; i<num; i++) {
+      attrs[std::string(keys[i])] = std::string(vals[i]);
+    }
+
+    //create a vector of tensors for inputs
+    std::vector<MXTensor> inputs(num_in);
+    for(int i=0; i<num_in; i++) {
+      inputs[i].data = indata[i];
+      inputs[i].dtype = (MXDType)intypes[i];
+      for(int j=0; j<indims[i]; j++) {
+        inputs[i].shape.push_back(inshapes[i][j]);
+      }
+    }
+
+    //create a vector of tensors for outputs
+    std::vector<MXTensor> outputs(num_out);
+    for(int i=0; i<num_out; i++) {
+      outputs[i].data = outdata[i];
+      outputs[i].dtype = (MXDType)outtypes[i];
+      for(int j=0; j<outdims[i]; j++) {
+        outputs[i].shape.push_back(outshapes[i][j]);
+      }
+    }
+
+    return op->getFCompute_gpu()(attrs,inputs,outputs);
+  }
 
 #ifndef MXNET_CUSTOM_OP
   static inline

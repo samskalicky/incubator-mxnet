@@ -111,8 +111,10 @@ int MXLoadCustomOpLib(const char* path) {
   CHECK(reg->_callInferType) << "Error getting _callInferType function from library";
   get_func(lib, (void_ptr)(&(reg->_callInferShape)), (char*)"_opCallInferShape");
   CHECK(reg->_callInferShape) << "Error getting _callInferShape function from library";
-  get_func(lib, (void_ptr)(&(reg->_callFCompute)), (char*)"_opCallFCompute");
-  CHECK(reg->_callFCompute) << "Error getting _callFCompute function from library";
+  get_func(lib, (void_ptr)(&(reg->_callFCompute_cpu)), (char*)"_opCallFCompute_cpu");
+  CHECK(reg->_callFCompute_cpu) << "Error getting _callFCompute_cpu function from library";
+  get_func(lib, (void_ptr)(&(reg->_callFCompute_gpu)), (char*)"_opCallFCompute_gpu");
+  CHECK(reg->_callFCompute_gpu) << "Error getting _callFCompute_gpu function from library";
   
   //get pointer to function to get op from lib
   get_op_t get_op;
@@ -122,26 +124,32 @@ int MXLoadCustomOpLib(const char* path) {
   //loop and register ops from lib
   for(int i=0; i<get_size(); i++) {
     char* name;
-    fcomp_t fcomp = nullptr;
+    fcomp_t cpufcomp = nullptr;
+    fcomp_t gpufcomp = nullptr;
     parseAttrs_t parse = nullptr;
     inferType_t type = nullptr;
     inferShape_t shape = nullptr;
     
     //get op
     get_op(i,&name,
-           &fcomp,
+           &cpufcomp,
+           &gpufcomp,
            &parse,
            &type,
            &shape);
 
-    CHECK(fcomp != nullptr) << "Error loading '" << name << "' custom op, FCompute function was not set.";
+    if(cpufcomp != nullptr && gpufcomp != nullptr) {
+      CHECK(cpufcomp != nullptr) << "Error loading '" << name << "' custom op, FCompute function was not set.";
+      CHECK(gpufcomp != nullptr) << "Error loading '" << name << "' custom op, FCompute function was not set.";
+    }
     CHECK(parse != nullptr) << "Error loading '" << name << "' custom op, ParseAttrs function was not set.";
     CHECK(type != nullptr) << "Error loading '" << name << "' custom op, InferType function was not set.";
     CHECK(shape != nullptr) << "Error loading '" << name << "' custom op, InferShape function was not set.";
     
     //register op
     reg->add(name)
-      .setFCompute(fcomp)
+      .setFCompute_cpu(cpufcomp)
+      .setFCompute_gpu(gpufcomp)
       .setParseAttrs(parse)
       .setInferType(type)
       .setInferShape(shape);
