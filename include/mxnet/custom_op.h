@@ -75,10 +75,17 @@ class CustomOp {
     allocations.push_back(ptr);
     return ptr;
   }
+  void release(void* ptr) {
+    auto it = std::find(allocations.begin(),allocations.end(),ptr);
+    if(it != allocations.end())
+      allocations.erase(it);
+    free(ptr);
+  }
   void freeAll() {
     for(auto ptr : allocations) {
       free(ptr);
     }
+    allocations.clear();
   }
  
   CustomOp& setFCompute(fcomp_t fcomp) {
@@ -186,14 +193,14 @@ class OpRegistry {
 
 extern "C" {
 #ifndef MXNET_CUSTOM_OP
-  static
+  static inline
 #endif
   int _opRegSize() {
     return OpRegistry::get()->size();
   }
 
 #ifndef MXNET_CUSTOM_OP
-  static
+  static inline
 #endif
   void _opRegGet(int idx, const char** name,
                  fcomp_t* func, parseAttrs_t* parse, inferType_t* type,
@@ -202,7 +209,7 @@ extern "C" {
   }
 
 #ifndef MXNET_CUSTOM_OP
-  static
+  static inline
 #endif
   int _opCallFCompute(const char* name, const char* const* keys, const char* const* vals, int num,
                        const int64_t** inshapes, int* indims, void** indata, int* intypes, int num_in,
@@ -240,7 +247,7 @@ extern "C" {
 
 
 #ifndef MXNET_CUSTOM_OP
-  static
+  static inline
 #endif
   int _opCallParseAttrs(const char* name, const char* const* keys, const char* const* vals, int num,
                          int* num_in, int* num_out) {
@@ -256,7 +263,7 @@ extern "C" {
   }
 
 #ifndef MXNET_CUSTOM_OP
-  static
+  static inline
 #endif
   int _opCallInferType(const char* name, const char* const* keys, const char* const* vals, int num,
                         int* intypes, int num_in, int* outtypes, int num_out) {
@@ -287,7 +294,7 @@ extern "C" {
   }
 
 #ifndef MXNET_CUSTOM_OP
-  static
+  static inline
 #endif
   int _opCallInferShape(mxAlloc_t mx_alloc, void* ptr,
                          const char* name, const char* const* keys, const char* const* vals, int num,
