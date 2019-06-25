@@ -9,7 +9,7 @@
 
 //User code
 int myFCompute(std::map<std::string,std::string> attrs,
-               std::vector<DLTensor> inputs, std::vector<DLTensor> outputs) {
+               DLTensor* inputs, num_outs, DLTensor* outputs, num_outs) {
   std::cout << "called myFCompute with :" << std::endl;
   std::cout << "\tattrs:    " << attrs.size() << std::endl;
   std::cout << "\tinputs:   " << inputs.size() << std::endl;

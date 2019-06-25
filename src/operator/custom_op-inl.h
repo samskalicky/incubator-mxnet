@@ -185,21 +185,17 @@ void Forward_cpu(const nnvm::NodeAttrs& attrs,
   const CustomOpParam& params = nnvm::get<CustomOpParam>(attrs.parsed);
   CHECK(params.op->getFCompute_cpu()) << "Error! Custom operator '" << params.op_type << "' does not support CPU forward";
 
-  std::vector<void*> in_data, out_data;
-  std::vector<const int64_t *> in_shapes, out_shapes;
-  std::vector<int> in_dims, out_dims;
-  std::vector<int> in_types, out_types;
+  std::vector<DLTensor> dl_inputs(num_in);
+  std::vector<DLTensor> dl_outputs(num_out);
 
   //create a vector of tensors for inputs
   int num_in = inputs.size();
-  std::vector<DLTensor> dl_inputs(num_in);
   for(int i=0; i<num_in; i++) {
     dl_inputs[i] = inputs[i].dltensor();
   }
 
   //create a vector of tensors for outputs
   int num_out = outputs.size();
-  std::vector<DLTensor> dl_outputs(num_out);
   for(int i=0; i<num_out; i++) {
       dl_outputs[i] = outputs[i].dltensor();
   }
@@ -208,8 +204,10 @@ void Forward_cpu(const nnvm::NodeAttrs& attrs,
                                          params.keys.data(),
                                          params.vals.data(),
                                          params.keys.size(),
-                                         dl_inputs,
-                                         dl_outputs)
+                                         dl_inputs.data(),
+                                         dl_inputs.size(),
+                                         dl_outputs.data(),
+                                         dl_outputs.size())
         ) << "Error calling CPU FCompute for custom operator '" << params.op_type << "'";
 }
 
@@ -221,39 +219,29 @@ void Forward_gpu(const nnvm::NodeAttrs& attrs,
   const CustomOpParam& params = nnvm::get<CustomOpParam>(attrs.parsed);
   CHECK(params.op->getFCompute_gpu()) << "Error! Custom operator '" << params.op_type << "' does not support GPU forward";
 
-  std::vector<void*> in_data, out_data;
-  std::vector<const int64_t *> in_shapes, out_shapes;
-  std::vector<int> in_dims, out_dims;
-  std::vector<int> in_types, out_types;
-  
-  for(size_t i=0; i<inputs.size(); i++) {
-    in_data.push_back(inputs[i].dptr_);
-    in_shapes.push_back(inputs[i].shape_.data());
-    in_dims.push_back(inputs[i].shape_.ndim());
-    in_types.push_back(inputs[i].type_flag_);
+  std::vector<DLTensor> dl_inputs(num_in);
+  std::vector<DLTensor> dl_outputs(num_out);
+
+  //create a vector of tensors for inputs
+  int num_in = inputs.size();
+  for(int i=0; i<num_in; i++) {
+    dl_inputs[i] = inputs[i].dltensor();
   }
-  
-  for(size_t i=0; i<outputs.size(); i++) {
-    out_data.push_back(outputs[i].dptr_);
-    out_shapes.push_back(outputs[i].shape_.data());
-    out_dims.push_back(outputs[i].shape_.ndim());
-    out_types.push_back(outputs[i].type_flag_);
+
+  //create a vector of tensors for outputs
+  int num_out = outputs.size();
+  for(int i=0; i<num_out; i++) {
+      dl_outputs[i] = outputs[i].dltensor();
   }
   
   CHECK(OpRegistry::get()->_callFCompute_gpu(params.op_type.c_str(),
                                          params.keys.data(),
                                          params.vals.data(),
                                          params.keys.size(),
-                                         in_shapes.data(),
-                                         in_dims.data(),
-                                         in_data.data(),
-                                         in_types.data(),
-                                         params.num_in,
-                                         out_shapes.data(),
-                                         out_dims.data(),
-                                         out_data.data(),
-                                         out_types.data(),
-                                         params.num_out)
+                                         dl_inputs.data(),
+                                         dl_inputs.size(),
+                                         dl_outputs.data(),
+                                         dl_outputs.size())
         ) << "Error calling GPU FCompute for custom operator '" << params.op_type << "'";
 }
  

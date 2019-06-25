@@ -38,7 +38,7 @@ enum MXDType {
 
 //User function templates
 typedef int (*fcomp_t)(std::map<std::string,std::string>,
-                        std::vector<DLTensor>, std::vector<DLTensor>);                        
+                       DLTensor*, int, DLTensor*, int);
 typedef int (*parseAttrs_t)(std::map<std::string,std::string>,
                             int*, int*);
 typedef int (*inferType_t)(std::map<std::string,std::string>,
@@ -55,8 +55,7 @@ typedef int (*get_size_t)(void);
 typedef void (*get_op_t)(int, char**, fcomp_t*, fcomp_t*, parseAttrs_t*, inferType_t*,
                          inferShape_t*);
 typedef int (*call_fcomp)(const char*, const char* const*, const char* const*, int,
-                           const int64_t**, int*, void**, int*, int,
-                           const int64_t**, int*, void**, int*, int);
+                           DLTensor*, int, DLTensor*, int);
 typedef int (*call_parseAttrs)(const char*, const char* const*, const char* const*, int,
                                 int*, int*);
 typedef int (*call_inferType)(const char*, const char* const*, const char* const*, int,
