@@ -185,17 +185,16 @@ void Forward_cpu(const nnvm::NodeAttrs& attrs,
   const CustomOpParam& params = nnvm::get<CustomOpParam>(attrs.parsed);
   CHECK(params.op->getFCompute_cpu()) << "Error! Custom operator '" << params.op_type << "' does not support CPU forward";
 
-  std::vector<DLTensor> dl_inputs(num_in);
-  std::vector<DLTensor> dl_outputs(num_out);
-
   //create a vector of tensors for inputs
   int num_in = inputs.size();
+  std::vector<DLTensor> dl_inputs(num_in);
   for(int i=0; i<num_in; i++) {
     dl_inputs[i] = inputs[i].dltensor();
   }
 
   //create a vector of tensors for outputs
   int num_out = outputs.size();
+  std::vector<DLTensor> dl_outputs(num_out);
   for(int i=0; i<num_out; i++) {
       dl_outputs[i] = outputs[i].dltensor();
   }
