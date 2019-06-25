@@ -191,14 +191,14 @@ void Forward_cpu(const nnvm::NodeAttrs& attrs,
   std::vector<int> in_types, out_types;
 
   //create a vector of tensors for inputs
-  int num_in = inputs.size()
+  int num_in = inputs.size();
   std::vector<DLTensor> dl_inputs(num_in);
   for(int i=0; i<num_in; i++) {
     dl_inputs[i] = inputs[i].dltensor();
   }
 
   //create a vector of tensors for outputs
-  int num_out = outputs.size()
+  int num_out = outputs.size();
   std::vector<DLTensor> dl_outputs(num_out);
   for(int i=0; i<num_out; i++) {
       dl_outputs[i] = outputs[i].dltensor();
