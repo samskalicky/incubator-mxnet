@@ -3,7 +3,7 @@
 #include <vector>
 #include <string>
 #include <functional>
-
+#include <algorithm>
 #include <stdint.h>
 
 #ifndef _MXNET_CUSTOM_OP_H_
