@@ -19,7 +19,7 @@ int myFCompute(std::map<std::string,std::string> attrs,
     int64_t cnt=0;
     for(int j=0; j<inputs[i].ndim; j++) {
       for(int k=0; k<inputs[i].shape[j]; k++) {
-        ((float)outputs[i].data)[cnt] = ((float)outputs[i].data)[cnt] + 42;
+        ((float*)outputs[i].data)[cnt] = ((float*)outputs[i].data)[cnt] + 42;
         cnt++;
       }
     }
