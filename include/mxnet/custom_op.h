@@ -231,7 +231,7 @@ extern "C" {
       attrs[std::string(keys[i])] = std::string(vals[i]);
     }
 
-    return op->getFCompute_cpu()(attrs,inputs,outputs);
+    return op->getFCompute_cpu()(attrs,inputs,num_inp,outputs,num_out);
   }
 
 #ifndef MXNET_CUSTOM_OP
@@ -248,7 +248,7 @@ extern "C" {
       attrs[std::string(keys[i])] = std::string(vals[i]);
     }
 
-    return op->getFCompute_gpu()(attrs,inputs,outputs);
+    return op->getFCompute_gpu()(attrs,inputs,num_inp,outputs,num_out);
   }
 
 #ifndef MXNET_CUSTOM_OP
