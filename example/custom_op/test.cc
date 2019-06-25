@@ -9,17 +9,17 @@
 
 //User code
 int myFCompute(std::map<std::string,std::string> attrs,
-               DLTensor* inputs, int num_outs, DLTensor* outputs, int num_outs) {
+               DLTensor* inputs, int num_inp, DLTensor* outputs, int num_out) {
   std::cout << "called myFCompute with :" << std::endl;
   std::cout << "\tattrs:    " << attrs.size() << std::endl;
-  std::cout << "\tinputs:   " << inputs.size() << std::endl;
-  std::cout << "\toutputs:  " << outputs.size() << std::endl;
+  std::cout << "\tinputs:   " << num_inp << std::endl;
+  std::cout << "\toutputs:  " << num_out << std::endl;
 
   for(int i=0; i<NUM_OUT; i++) {
     int64_t cnt=0;
-    for(int j=0; j<inputs[i].shape.size(); j++) {
+    for(int j=0; j<inputs[i].ndim; j++) {
       for(int k=0; k<inputs[i].shape[j]; k++) {
-        outputs[i].getData<float>()[cnt] = inputs[i].getData<float>()[cnt] + 42;
+        ((float)outputs[i].data)[cnt] = ((float)outputs[i].data)[cnt] + 42;
         cnt++;
       }
     }
