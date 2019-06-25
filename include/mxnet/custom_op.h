@@ -222,7 +222,7 @@ extern "C" {
   static inline
 #endif
   int _opCallFCompute_cpu(const char* name, const char* const* keys, const char* const* vals, int num,
-                       const std::vector<DLTensor>& inputs, const std::vector<DLTensor>& outputs) {
+                       DLTensor* inputs, int num_inp, DLTensor* outputs, int num_out) {
     CustomOp* op = OpRegistry::get()->op(name);
 
     //create map of attributes from list
@@ -239,7 +239,7 @@ extern "C" {
 #endif
 // TODID
   int _opCallFCompute_gpu(const char* name, const char* const* keys, const char* const* vals, int num,
-          const std::vector<DLTensor>& inputs, const std::vector<DLTensor>& outputs) {
+          DLTensor* inputs, int num_inp, DLTensor* outputs, int num_out) {
     CustomOp* op = OpRegistry::get()->op(name);
 
     //create map of attributes from list
