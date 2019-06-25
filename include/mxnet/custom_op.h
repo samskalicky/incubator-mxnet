@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include <functional>
+#include <algorithm>
 
 #include <stdint.h>
 
@@ -19,24 +20,24 @@ enum MXDType {
   kInt64 = 6,
 };
 
-struct MXTensor {
-  MXTensor() { data = nullptr; }
-  MXTensor(void *data, const std::vector<int64_t> &shape, MXDType dtype)
-  : data{data}, shape{shape}, dtype{dtype} {}
-
-  template<typename data_type>
-  data_type* getData() {
-    return (data_type*)data;
-  }
-  
-  void *data; // not owned
-  std::vector<int64_t> shape;
-  MXDType dtype;
-};
+//struct DLTensor {
+//  DLTensor() { data = nullptr; }
+//  DLTensor(void *data, const std::vector<int64_t> &shape, MXDType dtype)
+//  : data{data}, shape{shape}, dtype{dtype} {}
+//
+//  template<typename data_type>
+//  data_type* getData() {
+//    return (data_type*)data;
+//  }
+//  
+//  void *data; // not owned
+//  std::vector<int64_t> shape;
+//  MXDType dtype;
+//};
 
 //User function templates
 typedef int (*fcomp_t)(std::map<std::string,std::string>,
-                        std::vector<MXTensor>, std::vector<MXTensor>);                        
+                        std::vector<DLTensor>, std::vector<DLTensor>);                        
 typedef int (*parseAttrs_t)(std::map<std::string,std::string>,
                             int*, int*);
 typedef int (*inferType_t)(std::map<std::string,std::string>,
@@ -221,34 +222,13 @@ extern "C" {
   static inline
 #endif
   int _opCallFCompute_cpu(const char* name, const char* const* keys, const char* const* vals, int num,
-                       const int64_t** inshapes, int* indims, void** indata, int* intypes, int num_in,
-                       const int64_t** outshapes, int* outdims, void** outdata, int* outtypes, int num_out) {
+                       const std::vector<DLTensor>& inputs, const std::vector<DLTensor>& outputs) {
     CustomOp* op = OpRegistry::get()->op(name);
 
     //create map of attributes from list
     std::map<std::string,std::string> attrs;
     for(int i=0; i<num; i++) {
       attrs[std::string(keys[i])] = std::string(vals[i]);
-    }
-
-    //create a vector of tensors for inputs
-    std::vector<MXTensor> inputs(num_in);
-    for(int i=0; i<num_in; i++) {
-      inputs[i].data = indata[i];
-      inputs[i].dtype = (MXDType)intypes[i];
-      for(int j=0; j<indims[i]; j++) {
-        inputs[i].shape.push_back(inshapes[i][j]);
-      }
-    }
-
-    //create a vector of tensors for outputs
-    std::vector<MXTensor> outputs(num_out);
-    for(int i=0; i<num_out; i++) {
-      outputs[i].data = outdata[i];
-      outputs[i].dtype = (MXDType)outtypes[i];
-      for(int j=0; j<outdims[i]; j++) {
-        outputs[i].shape.push_back(outshapes[i][j]);
-      }
     }
 
     return op->getFCompute_cpu()(attrs,inputs,outputs);
@@ -257,35 +237,15 @@ extern "C" {
 #ifndef MXNET_CUSTOM_OP
   static inline
 #endif
+// TODID
   int _opCallFCompute_gpu(const char* name, const char* const* keys, const char* const* vals, int num,
-                       const int64_t** inshapes, int* indims, void** indata, int* intypes, int num_in,
-                       const int64_t** outshapes, int* outdims, void** outdata, int* outtypes, int num_out) {
+          const std::vector<DLTensor>& inputs, const std::vector<DLTensor>& outputs) {
     CustomOp* op = OpRegistry::get()->op(name);
 
     //create map of attributes from list
     std::map<std::string,std::string> attrs;
     for(int i=0; i<num; i++) {
       attrs[std::string(keys[i])] = std::string(vals[i]);
-    }
-
-    //create a vector of tensors for inputs
-    std::vector<MXTensor> inputs(num_in);
-    for(int i=0; i<num_in; i++) {
-      inputs[i].data = indata[i];
-      inputs[i].dtype = (MXDType)intypes[i];
-      for(int j=0; j<indims[i]; j++) {
-        inputs[i].shape.push_back(inshapes[i][j]);
-      }
-    }
-
-    //create a vector of tensors for outputs
-    std::vector<MXTensor> outputs(num_out);
-    for(int i=0; i<num_out; i++) {
-      outputs[i].data = outdata[i];
-      outputs[i].dtype = (MXDType)outtypes[i];
-      for(int j=0; j<outdims[i]; j++) {
-        outputs[i].shape.push_back(outshapes[i][j]);
-      }
     }
 
     return op->getFCompute_gpu()(attrs,inputs,outputs);

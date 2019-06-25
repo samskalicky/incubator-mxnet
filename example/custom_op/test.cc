@@ -2,13 +2,14 @@
 #include <map>
 #include <string>
 #include "custom_op.h"
+#include <dlpack/dlpack.h>
 
 #define NUM_IN 1
 #define NUM_OUT 1
 
 //User code
 int myFCompute(std::map<std::string,std::string> attrs,
-               std::vector<MXTensor> inputs, std::vector<MXTensor> outputs) {
+               std::vector<DLTensor> inputs, std::vector<DLTensor> outputs) {
   std::cout << "called myFCompute with :" << std::endl;
   std::cout << "\tattrs:    " << attrs.size() << std::endl;
   std::cout << "\tinputs:   " << inputs.size() << std::endl;
