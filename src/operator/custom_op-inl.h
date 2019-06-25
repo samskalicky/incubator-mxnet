@@ -27,6 +27,7 @@
 #include "./mxnet_op.h"
 #include "./operator_common.h"
 #include "mxnet/custom_op.h"
+#include <dlpack/dlpack.h>
 
 namespace mxnet {
 namespace op {

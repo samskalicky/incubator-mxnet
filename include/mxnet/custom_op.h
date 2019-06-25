@@ -4,6 +4,7 @@
 #include <string>
 #include <functional>
 #include <algorithm>
+#include <dlpack/dlpack.h>
 
 #include <stdint.h>
 
