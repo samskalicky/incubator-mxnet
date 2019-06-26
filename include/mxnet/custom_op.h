@@ -5,7 +5,6 @@
 #include <functional>
 #include <algorithm>
 #include <dlpack/dlpack.h>
-
 #include <stdint.h>
 
 #ifndef _MXNET_CUSTOM_OP_H_
@@ -20,21 +19,6 @@ enum MXDType {
   kInt8  = 5,
   kInt64 = 6,
 };
-
-//struct DLTensor {
-//  DLTensor() { data = nullptr; }
-//  DLTensor(void *data, const std::vector<int64_t> &shape, MXDType dtype)
-//  : data{data}, shape{shape}, dtype{dtype} {}
-//
-//  template<typename data_type>
-//  data_type* getData() {
-//    return (data_type*)data;
-//  }
-//  
-//  void *data; // not owned
-//  std::vector<int64_t> shape;
-//  MXDType dtype;
-//};
 
 //User function templates
 typedef int (*fcomp_t)(std::map<std::string,std::string>,
