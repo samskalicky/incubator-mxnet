@@ -4,6 +4,7 @@
 #include <string>
 #include <functional>
 #include <algorithm>
+#include <dlpack/dlpack.h>
 #include <stdint.h>
 
 #ifndef _MXNET_CUSTOM_OP_H_
@@ -19,24 +20,9 @@ enum MXDType {
   kInt64 = 6,
 };
 
-struct MXTensor {
-  MXTensor() { data = nullptr; }
-  MXTensor(void *data, const std::vector<int64_t> &shape, MXDType dtype)
-  : data{data}, shape{shape}, dtype{dtype} {}
-
-  template<typename data_type>
-  data_type* getData() {
-    return (data_type*)data;
-  }
-  
-  void *data; // not owned
-  std::vector<int64_t> shape;
-  MXDType dtype;
-};
-
 //User function templates
 typedef int (*fcomp_t)(std::map<std::string,std::string>,
-                        std::vector<MXTensor>, std::vector<MXTensor>);                        
+                       DLTensor*, int, DLTensor*, int);
 typedef int (*parseAttrs_t)(std::map<std::string,std::string>,
                             int*, int*);
 typedef int (*inferType_t)(std::map<std::string,std::string>,
@@ -53,8 +39,7 @@ typedef int (*get_size_t)(void);
 typedef void (*get_op_t)(int, char**, fcomp_t*, fcomp_t*, parseAttrs_t*, inferType_t*,
                          inferShape_t*);
 typedef int (*call_fcomp)(const char*, const char* const*, const char* const*, int,
-                           const int64_t**, int*, void**, int*, int,
-                           const int64_t**, int*, void**, int*, int);
+                           DLTensor*, int, DLTensor*, int);
 typedef int (*call_parseAttrs)(const char*, const char* const*, const char* const*, int,
                                 int*, int*);
 typedef int (*call_inferType)(const char*, const char* const*, const char* const*, int,
@@ -221,8 +206,7 @@ extern "C" {
   static inline
 #endif
   int _opCallFCompute_cpu(const char* name, const char* const* keys, const char* const* vals, int num,
-                       const int64_t** inshapes, int* indims, void** indata, int* intypes, int num_in,
-                       const int64_t** outshapes, int* outdims, void** outdata, int* outtypes, int num_out) {
+                       DLTensor* inputs, int num_inp, DLTensor* outputs, int num_out) {
     CustomOp* op = OpRegistry::get()->op(name);
 
     //create map of attributes from list
@@ -231,35 +215,15 @@ extern "C" {
       attrs[std::string(keys[i])] = std::string(vals[i]);
     }
 
-    //create a vector of tensors for inputs
-    std::vector<MXTensor> inputs(num_in);
-    for(int i=0; i<num_in; i++) {
-      inputs[i].data = indata[i];
-      inputs[i].dtype = (MXDType)intypes[i];
-      for(int j=0; j<indims[i]; j++) {
-        inputs[i].shape.push_back(inshapes[i][j]);
-      }
-    }
-
-    //create a vector of tensors for outputs
-    std::vector<MXTensor> outputs(num_out);
-    for(int i=0; i<num_out; i++) {
-      outputs[i].data = outdata[i];
-      outputs[i].dtype = (MXDType)outtypes[i];
-      for(int j=0; j<outdims[i]; j++) {
-        outputs[i].shape.push_back(outshapes[i][j]);
-      }
-    }
-
-    return op->getFCompute_cpu()(attrs,inputs,outputs);
+    return op->getFCompute_cpu()(attrs,inputs,num_inp,outputs,num_out);
   }
 
 #ifndef MXNET_CUSTOM_OP
   static inline
 #endif
+// TODID
   int _opCallFCompute_gpu(const char* name, const char* const* keys, const char* const* vals, int num,
-                       const int64_t** inshapes, int* indims, void** indata, int* intypes, int num_in,
-                       const int64_t** outshapes, int* outdims, void** outdata, int* outtypes, int num_out) {
+          DLTensor* inputs, int num_inp, DLTensor* outputs, int num_out) {
     CustomOp* op = OpRegistry::get()->op(name);
 
     //create map of attributes from list
@@ -268,27 +232,7 @@ extern "C" {
       attrs[std::string(keys[i])] = std::string(vals[i]);
     }
 
-    //create a vector of tensors for inputs
-    std::vector<MXTensor> inputs(num_in);
-    for(int i=0; i<num_in; i++) {
-      inputs[i].data = indata[i];
-      inputs[i].dtype = (MXDType)intypes[i];
-      for(int j=0; j<indims[i]; j++) {
-        inputs[i].shape.push_back(inshapes[i][j]);
-      }
-    }
-
-    //create a vector of tensors for outputs
-    std::vector<MXTensor> outputs(num_out);
-    for(int i=0; i<num_out; i++) {
-      outputs[i].data = outdata[i];
-      outputs[i].dtype = (MXDType)outtypes[i];
-      for(int j=0; j<outdims[i]; j++) {
-        outputs[i].shape.push_back(outshapes[i][j]);
-      }
-    }
-
-    return op->getFCompute_gpu()(attrs,inputs,outputs);
+    return op->getFCompute_gpu()(attrs,inputs,num_inp,outputs,num_out);
   }
 
 #ifndef MXNET_CUSTOM_OP
