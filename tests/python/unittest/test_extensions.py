@@ -36,7 +36,11 @@ def check_platform():
 def test_custom_op():
     # possible places to find library file
     if (os.name=='posix'):
-        lib = 'libcustomop_lib.so'
+        # check if mac
+        if platform.system() == 'Darwin':
+            lib = 'libcustomop_lib.dylib'
+        else:
+            lib = 'libcustomop_lib.so'
         if os.path.exists(lib):
             fname = lib
         elif os.path.exists(os.path.join(base_path,'build/'+lib)):
