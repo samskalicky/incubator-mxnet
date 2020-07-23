@@ -17,6 +17,7 @@
 
 """Namespace for operators used in Gluon dispatched by F=ndarray."""
 import numpy as np
+from ...util import is_np_default_dtype
 from ...context import current_context
 from . import _internal as _npi
 from . import _api_internal
@@ -76,7 +77,7 @@ def randint(low, high=None, size=None, dtype=None, ctx=None, out=None):
 
     >>> np.random.randint(5, size=(2, 4))
     array([[4, 0, 2, 1],
-        [3, 2, 2, 0]])
+           [3, 2, 2, 0]])
     """
     if dtype is None:
         dtype = 'int'
@@ -112,7 +113,9 @@ def uniform(low=0.0, high=1.0, size=None, dtype=None, ctx=None, out=None):
         a scalar tensor containing a single value is returned if
         ``low`` and ``high`` are both scalars.
     dtype : {'float16', 'float32', 'float64'}, optional
-        Data type of output samples. Default is 'float32'
+        Data type of output samples.
+        When npx.is_np_default_dtype() returns False, default dtype is float32;
+        When npx.is_np_default_dtype() returns True, default dtype is float64.
     ctx : Context, optional
         Device context of output. Default is current context.
     out : ``ndarray``, optional
@@ -123,8 +126,6 @@ def uniform(low=0.0, high=1.0, size=None, dtype=None, ctx=None, out=None):
     out : ndarray
         Drawn samples from the parameterized uniform distribution.
     """
-    if dtype is None:
-        dtype = 'float32'
     if ctx is None:
         ctx = str(current_context())
     else:
@@ -154,7 +155,9 @@ def normal(loc=0.0, scale=1.0, size=None, dtype=None, ctx=None, out=None):
         samples are drawn. If size is `None` (default), a scalar tensor containing
         a single value is returned if loc and scale are both scalars.
     dtype : {'float16', 'float32', 'float64'}, optional
-        Data type of output samples. Default is 'float32'
+        Data type of output samples.
+        When npx.is_np_default_dtype() returns False, default dtype is float32;
+        When npx.is_np_default_dtype() returns True, default dtype is float64.
     ctx : Context, optional
         Device context of output. Default is current context.
     out : ``ndarray``, optional
@@ -165,8 +168,6 @@ def normal(loc=0.0, scale=1.0, size=None, dtype=None, ctx=None, out=None):
     out : ndarray
         Drawn samples from the parameterized normal distribution.
     """
-    if dtype is None:
-        dtype = 'float32'
     if ctx is None:
         ctx = str(current_context())
     else:
@@ -242,24 +243,13 @@ def logistic(loc=0.0, scale=1.0, size=None, ctx=None, out=None):
     out : ndarray or scalar
         Drawn samples from the parameterized logistic distribution.
     """
-    from ...numpy import ndarray as np_ndarray
-    input_type = (isinstance(loc, np_ndarray), isinstance(scale, np_ndarray))
     if ctx is None:
-        ctx = current_context()
+        ctx = str(current_context())
+    else:
+        ctx = str(ctx)
     if size == ():
         size = None
-    if input_type == (True, True):
-        return _npi.logistic(loc, scale, loc=None, scale=None, size=size,
-                             ctx=ctx, out=out)
-    elif input_type == (False, True):
-        return _npi.logistic(scale, loc=loc, scale=None, size=size,
-                             ctx=ctx, out=out)
-    elif input_type == (True, False):
-        return _npi.logistic(loc, loc=None, scale=scale, size=size,
-                             ctx=ctx, out=out)
-    else:
-        return _npi.logistic(loc=loc, scale=scale, size=size,
-                             ctx=ctx, out=out)
+    return _api_internal.logistic(loc, scale, size, ctx, out)
 
 
 def gumbel(loc=0.0, scale=1.0, size=None, ctx=None, out=None):
@@ -290,24 +280,13 @@ def gumbel(loc=0.0, scale=1.0, size=None, ctx=None, out=None):
     out : ndarray or scalar
         Drawn samples from the parameterized Gumbel distribution.
     """
-    from ...numpy import ndarray as np_ndarray
-    input_type = (isinstance(loc, np_ndarray), isinstance(scale, np_ndarray))
     if ctx is None:
-        ctx = current_context()
+        ctx = str(current_context())
+    else:
+        ctx = str(ctx)
     if size == ():
         size = None
-    if input_type == (True, True):
-        return _npi.gumbel(loc, scale, loc=None, scale=None, size=size,
-                           ctx=ctx, out=out)
-    elif input_type == (False, True):
-        return _npi.gumbel(scale, loc=loc, scale=None, size=size,
-                           ctx=ctx, out=out)
-    elif input_type == (True, False):
-        return _npi.gumbel(loc, loc=None, scale=scale, size=size,
-                           ctx=ctx, out=out)
-    else:
-        return _npi.gumbel(loc=loc, scale=scale, size=size,
-                           ctx=ctx, out=out)
+    return _api_internal.gumbel(loc, scale, size, ctx, out)
 
 
 def multinomial(n, pvals, size=None):
@@ -387,17 +366,13 @@ def rayleigh(scale=1.0, size=None, ctx=None, out=None):
     out : ndarray or scalar
         Drawn samples from the parameterized Rayleigh distribution.
     """
-    from ...numpy import ndarray as np_ndarray
-    tensor_type_name = np_ndarray
     if ctx is None:
-        ctx = current_context()
+        ctx = str(current_context())
+    else:
+        ctx = str(ctx)
     if size == ():
         size = None
-    is_tensor = isinstance(scale, tensor_type_name)
-    if is_tensor:
-        return _npi.rayleigh(scale, scale=None, size=size, ctx=ctx, out=out)
-    else:
-        return _npi.rayleigh(scale=scale, size=size, ctx=ctx, out=out)
+    return _api_internal.rayleigh(scale, size, ctx, out)
 
 
 def multivariate_normal(mean, cov, size=None, check_valid=None, tol=None):
@@ -535,24 +510,16 @@ def choice(a, size=None, replace=True, p=None, ctx=None, out=None):
     """
     from ...numpy import ndarray as np_ndarray
     if ctx is None:
-        ctx = current_context()
+        ctx = str(current_context())
+    else:
+        ctx = str(ctx)
     if size == ():
         size = None
     if isinstance(a, np_ndarray):
-        ctx = None
-        if p is None:
-            indices = _npi.choice(a, a=None, size=size,
-                                  replace=replace, ctx=ctx, weighted=False)
-            return _npi.take(a, indices)
-        else:
-            indices = _npi.choice(a, p, a=None, size=size,
-                                  replace=replace, ctx=ctx, weighted=True)
-            return _npi.take(a, indices)
+        indices = _api_internal.choice(a, size, replace, p, ctx, out)
+        return _api_internal.take(a, indices, 0, 'raise', out)
     else:
-        if p is None:
-            return _npi.choice(a=a, size=size, replace=replace, ctx=ctx, weighted=False, out=out)
-        else:
-            return _npi.choice(p, a=a, size=size, replace=replace, ctx=ctx, weighted=True, out=out)
+        return _api_internal.choice(a, size, replace, p, ctx, out)
 
 
 def exponential(scale=1.0, size=None, ctx=None, out=None):
@@ -578,18 +545,13 @@ def exponential(scale=1.0, size=None, ctx=None, out=None):
     out : ndarray or scalar
         Drawn samples from the parameterized exponential distribution.
     """
-    from ...numpy import ndarray as np_ndarray
-    tensor_type_name = np_ndarray
     if ctx is None:
-        ctx = current_context()
+        ctx = str(current_context())
+    else:
+        ctx = str(ctx)
     if size == ():
         size = None
-    is_tensor = isinstance(scale, tensor_type_name)
-    if is_tensor:
-        return _npi.exponential(scale, scale=None, size=size,
-                                ctx=ctx, out=out)
-    else:
-        return _npi.exponential(scale=scale, size=size, ctx=ctx, out=out)
+    return _api_internal.exponential(scale, size, ctx, out)
 
 
 def weibull(a, size=None, ctx=None, out=None):
@@ -634,17 +596,13 @@ def weibull(a, size=None, ctx=None, out=None):
     model time to failure, in modeling particle sizes, in information retrieval
     to model dwell time on pages, in quantitative finance to model risk etc.
     """
-    from ...numpy import ndarray as np_ndarray
-    tensor_type_name = np_ndarray
     if ctx is None:
-        ctx = current_context()
+        ctx = str(current_context())
+    else:
+        ctx = str(ctx)
     if size == ():
         size = None
-    is_tensor = isinstance(a, tensor_type_name)
-    if is_tensor:
-        return _npi.weibull(a, a=None, size=size, ctx=ctx, out=out)
-    else:
-        return _npi.weibull(a=a, size=size, ctx=ctx, out=out)
+    return _api_internal.weibull(a, size, ctx, out)
 
 
 def pareto(a, size=None, ctx=None, out=None):
@@ -679,20 +637,16 @@ def pareto(a, size=None, ctx=None, out=None):
     where a is the shape and m the scale. Here m is assumed 1. The Pareto distribution
     is a power law distribution. Pareto created it to describe the wealth in the economy.
     """
-    from ...numpy import ndarray as np_ndarray
-    tensor_type_name = np_ndarray
     if ctx is None:
-        ctx = current_context()
+        ctx = str(current_context())
+    else:
+        ctx = str(ctx)
     if size == ():
         size = None
-    is_tensor = isinstance(a, tensor_type_name)
-    if is_tensor:
-        return _npi.pareto(a, a=None, size=size, ctx=ctx, out=out)
-    else:
-        return _npi.pareto(a=a, size=size, ctx=ctx, out=out)
+    return _api_internal.pareto(a, size, ctx, out)
 
 
-def power(a, size=None):
+def power(a, size=None, ctx=None, out=None):
     r"""Draw samples in [0, 1] from a power distribution with given parameter a.
 
     Parameters
@@ -724,15 +678,13 @@ def power(a, size=None):
     The power distribution is just the inverse of the Pareto distribution and
     a special case of the Beta distribution.
     """
-    from ...numpy import ndarray as np_ndarray
-    tensor_type_name = np_ndarray
+    if ctx is None:
+        ctx = str(current_context())
+    else:
+        ctx = str(ctx)
     if size == ():
         size = None
-    is_tensor = isinstance(a, tensor_type_name)
-    if is_tensor:
-        return _npi.powerd(a, a=None, size=size)
-    else:
-        return _npi.powerd(a=a, size=size)
+    return _api_internal.powerd(a, size, ctx, out)
 
 
 def gamma(shape, scale=1.0, size=None, dtype=None, ctx=None, out=None):
@@ -755,7 +707,9 @@ def gamma(shape, scale=1.0, size=None, dtype=None, ctx=None, out=None):
         a single value is returned if ``shape`` and ``scale`` are both scalars.
         Otherwise, ``np.broadcast(shape, scale).size`` samples are drawn.
     dtype : {'float16', 'float32', 'float64'}, optional
-        Data type of output samples. Default is 'float32'.
+        Data type of output samples.
+        When npx.is_np_default_dtype() returns False, default dtype is float32;
+        When npx.is_np_default_dtype() returns True, default dtype is float64.
     ctx : Context, optional
         Device context of output. Default is current context.
 
@@ -768,8 +722,6 @@ def gamma(shape, scale=1.0, size=None, dtype=None, ctx=None, out=None):
     electronic components, and arises naturally in processes for which the
     waiting times between Poisson distributed events are relevant.
     """
-    if dtype is None:
-        dtype = 'float32'
     if out is not None:
         size = out.shape
     if size == ():
@@ -812,7 +764,9 @@ def beta(a, b, size=None, dtype=None, ctx=None):
         a single value is returned if ``a`` and ``b`` are both scalars.
         Otherwise, ``np.broadcast(a, b).size`` samples are drawn.
     dtype : {'float16', 'float32', 'float64'}, optional
-        Data type of output samples. Default is 'float32'.
+        Data type of output samples.
+        When npx.is_np_default_dtype() returns False, default dtype is float32;
+        When npx.is_np_default_dtype() returns True, default dtype is float64.
     ctx : Context, optional
         Device context of output. Default is current context.
 
@@ -826,7 +780,7 @@ def beta(a, b, size=None, dtype=None, ctx=None):
         Drawn samples from the parameterized beta distribution.
     """
     if dtype is None:
-        dtype = 'float32'
+        dtype = np.float64 if is_np_default_dtype() else np.float32
     if ctx is None:
         ctx = current_context()
     if size == ():
@@ -834,7 +788,7 @@ def beta(a, b, size=None, dtype=None, ctx=None):
     # use fp64 to prevent precision loss
     X = gamma(a, 1, size=size, dtype='float64', ctx=ctx)
     Y = gamma(b, 1, size=size, dtype='float64', ctx=ctx)
-    out = X/(X + Y)
+    out = X / (X + Y)
     return out.astype(dtype)
 
 
@@ -923,7 +877,9 @@ def chisquare(df, size=None, dtype=None, ctx=None):
         a single value is returned if ``df`` is a scalar.  Otherwise,
         ``np.array(df).size`` samples are drawn.
     dtype : {'float16', 'float32', 'float64'}, optional
-        Data type of output samples. Default is 'float32'.
+        Data type of output samples.
+        When npx.is_np_default_dtype() returns False, default dtype is float32;
+        When npx.is_np_default_dtype() returns True, default dtype is float64.
         Dtype 'float32' or 'float64' is strongly recommended,
         since lower precision might lead to out of range issue.
     ctx : Context, optional
@@ -971,7 +927,7 @@ def chisquare(df, size=None, dtype=None, ctx=None):
     array([ 1.89920014,  9.00867716,  3.13710533,  5.62318272]) # random
     """
     if dtype is None:
-        dtype = 'float32'
+        dtype = np.float64 if is_np_default_dtype() else np.float32
     if ctx is None:
         ctx = current_context()
     if size == ():
@@ -1039,7 +995,7 @@ def shuffle(x):
            [3., 4., 5.],
            [0., 1., 2.]])
     """
-    _npi.shuffle(x, out=x)
+    _api_internal.shuffle(x, x)
 
 
 def laplace(loc=0.0, scale=1.0, size=None, dtype=None, ctx=None, out=None):
