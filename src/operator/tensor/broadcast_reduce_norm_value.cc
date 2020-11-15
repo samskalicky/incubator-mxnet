@@ -26,6 +26,9 @@
 
 namespace mxnet {
 namespace op {
+
+#if !defined(__EXCLUDE_ALL_OPS__) || (defined(__EXCLUDE_ALL_OPS__) && defined(__INCLUDE_OP_NORM__))
+
 DMLC_REGISTER_PARAMETER(NormParam);
 
 template<>
@@ -116,6 +119,7 @@ NNVM_REGISTER_OP(_backward_norm)
   })
 .set_attr<FCompute>("FCompute<cpu>", LpNormGradCompute<cpu>);
 
+#endif
 
 }  // namespace op
 }  // namespace mxnet
