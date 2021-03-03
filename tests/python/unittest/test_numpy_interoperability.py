@@ -1488,6 +1488,12 @@ def _add_workload_lcm():
     OpArgMngr.add_workload('lcm', np.array(195225786*2, dtype=np.int32), np.array(195225786*5, dtype=np.int32))
 
 
+def _add_workload_gcd():
+    OpArgMngr.add_workload('gcd', np.array([24, 30], dtype=np.int8), np.array([20, 75], dtype=np.int8))
+    OpArgMngr.add_workload('gcd', np.array([24, 30], dtype=np.uint8), np.array([20, 75], dtype=np.uint8))
+    OpArgMngr.add_workload('gcd', np.array(195225786*2, dtype=np.int32), np.array(195225786*5, dtype=np.int32))
+
+
 def _add_workload_bitwise_or():
     OpArgMngr.add_workload('bitwise_or', np.array([False, False, True, True], dtype=np.bool),
                            np.array([False, True, False, True], dtype=np.bool))
@@ -3071,6 +3077,7 @@ def _prepare_workloads():
     _add_workload_interp()
     _add_workload_hypot()
     _add_workload_lcm()
+    _add_workload_gcd()
     _add_workload_bitwise_and()
     _add_workload_bitwise_xor()
     _add_workload_bitwise_or()
@@ -3255,13 +3262,15 @@ def _check_interoperability_helper(op_name, rel_tol, abs_tol, *args, **kwargs):
     strs = op_name.split('.')
     if len(strs) == 1:
         onp_op = getattr(_np, op_name)
+        mxnp_op = getattr(np, op_name)
     elif len(strs) == 2:
         onp_op = getattr(getattr(_np, strs[0]), strs[1])
+        mxnp_op = getattr(getattr(np, strs[0]), strs[1])
     else:
         assert False
     if not is_op_runnable():
         return
-    out = onp_op(*args, **kwargs)
+    out = mxnp_op(*args, **kwargs)
     expected_out = _get_numpy_op_output(onp_op, *args, **kwargs)
     if isinstance(out, (tuple, list)):
         assert type(out) == type(expected_out)

@@ -161,7 +161,7 @@ def test_subgraph():
     # Gluon Hybridize partitioning with shapes/types
     sym_block = nn.SymbolBlock(sym, [a,b])
     sym_block.initialize()
-    sym_block.hybridize(backend='myProp')
+    sym_block.optimize_for(mx.nd.ones((3,2)),mx.nd.ones((3,2)),backend='myProp')
     out4 = sym_block(mx.nd.ones((3,2)),mx.nd.ones((3,2)))
     # check that result matches one executed by MXNet
     assert_almost_equal(out[0].asnumpy(), out4[0].asnumpy(), rtol=1e-3, atol=1e-3)
@@ -179,13 +179,20 @@ def test_subgraph():
     a_data = mx.nd.ones((3,2))
     b_data = mx.nd.ones((3,2))
     sym_block3.optimize_for(a_data, b_data, backend='myProp')
-    sym_block3.export('optimized')
-    sym_block4 = nn.SymbolBlock.imports('optimized-symbol.json',['a','b'],
-                                        'optimized-0000.params')
+    sym_filename, params_filename = sym_block3.export('optimized')
+    assert sym_filename == 'optimized-symbol.json'
+    assert params_filename is None
 
-    out5 = sym_block4(a_data, b_data)
+    # Test with additional input to subgraph op
+    sym_block3.optimize_for(a_data, b_data, backend="addInputPass")
+    out5 = sym_block3(a_data, b_data)
+
+    # Reload exported block
+    sym_block4 = nn.SymbolBlock.imports(sym_filename, ['a','b'], params_filename)
+
+    out6 = sym_block4(a_data, b_data)
     # check that result matches one executed by MXNet
-    assert_almost_equal(out[0].asnumpy(), out5[0].asnumpy(), rtol=1e-3, atol=1e-3)
+    assert_almost_equal(out[0].asnumpy(), out6[0].asnumpy(), rtol=1e-3, atol=1e-3)
 
 @pytest.mark.skipif(check_platform(['x86_64']), reason="not all machine types supported")
 @pytest.mark.skipif(is_cd_run(), reason="continuous delivery run - ignoring test")
