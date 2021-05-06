@@ -51,7 +51,7 @@ def def_model_from_func(func, dummy_input=False, **params):
                 return func(*inputs, **params)
     return Model
 
-def op_export_test(model_name, Model, inputs, tmp_path, dummy_input=False, onnx_map=None, mx_map=None):
+def op_export_test(model_name, Model, inputs, tmp_path, dummy_input=False, onnx_map=None, mx_map=None, rtol=None, atol=None):
     def export_to_onnx(model, model_name, inputs):
         model_path = '{}/{}'.format(tmp_path, model_name)
         model.export(model_path, epoch=0)
@@ -82,11 +82,11 @@ def op_export_test(model_name, Model, inputs, tmp_path, dummy_input=False, onnx_
         for i in range(len(pred_mx)):
             pred_onx_i = onnx_map(pred_onx[i]) if onnx_map else pred_onx[i]
             pred_mx_i = mx_map(pred_mx[i]) if mx_map else pred_mx[i]
-            assert_almost_equal(pred_onx_i, pred_mx_i, equal_nan=True)
+            assert_almost_equal(pred_onx_i, pred_mx_i, equal_nan=True, rtol=rtol, atol=atol)
     else:
         pred_onx = onnx_map(pred_onx[0]) if onnx_map else pred_onx[0]
         pred_mx = mx_map(pred_mx) if mx_map else pred_mx
-        assert_almost_equal(pred_onx, pred_mx, equal_nan=True)
+        assert_almost_equal(pred_onx, pred_mx, equal_nan=True, rtol=rtol, atol=atol)
 
 
 def test_onnx_export_abs(tmp_path):
@@ -250,6 +250,8 @@ def test_onnx_export_reshape(tmp_path, dtype):
     op_export_test('reshape_2', M2, [x], tmp_path)
     M3 = def_model('reshape', shape=(5, 1, 1, 1, 1, 0 -1, 0), reverse=True)
     op_export_test('reshape_3', M3, [x], tmp_path)
+    M4 = def_model('reshape', shape=(-3, -1))
+    op_export_test('reshape_4', M4, [x], tmp_path)
 
 
 @pytest.mark.parametrize('dtype', ['float32', 'float64', 'int32', 'int64'])
@@ -1047,16 +1049,17 @@ def test_onnx_export_log2(tmp_path, dtype):
 
 @pytest.mark.parametrize('dtype', ['int32', 'int64', 'float16', 'float32', 'float64'])
 @pytest.mark.parametrize('axis', [None, 1, [1,2], -1])
-def test_onnx_export_sum(tmp_path, dtype, axis):
+@pytest.mark.parametrize('operator', ['sum', 'sum_axis'])
+def test_onnx_export_sum(tmp_path, dtype, axis, operator):
     if 'int' in dtype:
         x = mx.nd.random.randint(0, 10, (5, 6, 7, 8), dtype=dtype)
     else:
         x = mx.nd.random.normal(0, 10, (5, 6, 7, 8), dtype=dtype)
     if axis is not None:
-        M = def_model('sum', axis=axis)
+        M = def_model(operator, axis=axis)
     else:
-        M = def_model('sum')
-    op_export_test('sum', M, [x], tmp_path)
+        M = def_model(operator)
+    op_export_test(operator, M, [x], tmp_path)
 
 
 @pytest.mark.parametrize('dtype', ['float16', 'float32', 'float64', 'int32', 'int64'])
@@ -1232,36 +1235,47 @@ def test_onnx_export_sequence_reverse(tmp_path, dtype, params):
     M1 = def_model('SequenceReverse', use_sequence_length=True)
     op_export_test('SequenceReverse1', M1, [x, seq_len], tmp_path)
 
-
-# onnx LSTM from opset 11 does not support float64
-@pytest.mark.parametrize('mode', ['lstm', 'gru'])
+@pytest.mark.parametrize('mode', ['lstm', 'gru', 'rnn_tanh', 'rnn_relu'])
 @pytest.mark.parametrize('dtype', ['float32'])
 @pytest.mark.parametrize('state_size', [16, 32])
 @pytest.mark.parametrize('input_size', [16, 32, 64])
 @pytest.mark.parametrize('num_layers', [1, 2])
 @pytest.mark.parametrize('batch_size', [1, 2, 4])
-@pytest.mark.parametrize('seq_length', [16, 32])
-def test_onnx_export_RNN(tmp_path, mode, dtype, state_size, input_size, num_layers, batch_size, seq_length):
+@pytest.mark.parametrize('seq_length', [16])
+@pytest.mark.parametrize('bidirectional', [True, False])
+def test_onnx_export_RNN(tmp_path, mode, dtype, state_size, input_size, num_layers, batch_size, seq_length, bidirectional):
     # TODO: The current implementation fails assertion checks for large parm/state_size. 
-
     # for num_layers >= 2, input_size must equal to state_size
     if num_layers >= 2 and input_size != state_size:
         return
-    factor = 3
-    if mode == 'lstm':
+    # Currently only bidirectional supports lstm with num_layers = 1
+    if bidirectional and (mode != 'lstm' or num_layers != 1):
+        return
+
+    b = 1
+    if bidirectional:
+        b = 2
+
+    factor = 1
+    if mode == 'gru':
+        factor = 3
+    elif mode == 'lstm':
         factor = 4
 
-    M = def_model('RNN', mode=mode, state_size=state_size, state_outputs=True,  num_layers=num_layers, p=0)
+    M = def_model('RNN', mode=mode, state_size=state_size, state_outputs=True,  num_layers=num_layers, p=0, bidirectional=bidirectional)
     x = mx.nd.random.normal(0, 10, (seq_length, batch_size, input_size), dtype=dtype)
-    param = mx.nd.random.normal(0, 1, [num_layers*factor*state_size*input_size +
-                                       num_layers*factor*state_size*state_size +
-                                       num_layers*2*factor*state_size], dtype=dtype)
-    state = mx.nd.random.uniform(-1, 1, [num_layers, batch_size, state_size], dtype=dtype)
+    param = mx.nd.random.normal(0, 1, [b*num_layers*factor*state_size*input_size +
+                                       b*num_layers*factor*state_size*state_size +
+                                       b*num_layers*2*factor*state_size], dtype=dtype)
+    state = mx.nd.random.uniform(-1, 1, [b*num_layers, batch_size, state_size], dtype=dtype)
     if mode == 'lstm':
-        cell = mx.nd.random.uniform(-1, 1, [num_layers, batch_size, state_size], dtype=dtype)
+        cell = mx.nd.random.uniform(-1, 1, [b*num_layers, batch_size, state_size], dtype=dtype)
         op_export_test('rnn', M, [x, param, state, cell], tmp_path)
+    elif mode == 'rnn_relu':
+        # set large atol as relu can outputs big numbers
+        op_export_test('rnn', M, [x, param, state], tmp_path, atol=1e20)
     else:
-        op_export_test('rnn', M, [x, param, state], tmp_path)
+        op_export_test('rnn', M, [x, param, state], tmp_path, atol=1e-2)
 
 
 @pytest.mark.parametrize('dtype', ['float16', 'float32', 'int32', 'int64'])
@@ -1625,7 +1639,7 @@ def test_onnx_export_clip(tmp_path, dtype, shape):
                                   lambda x : x * np.random.rand(1)[0]*100,
                                   lambda x : x - np.random.rand(1)[0]*100,
                                   lambda x : np.random.rand(1)[0]*100 - x,
-                                  lambda x : x / (np.random.rand(1)[0]*100),
+                                  lambda x : x / (np.random.rand(1)[0]*100 + 1),
                                   lambda x : np.random.rand(1)[0]*100 / x,
                                   lambda x : x ** np.random.rand(1)[0]*10,
                                  ])
@@ -1853,3 +1867,19 @@ def test_onnx_export_sample_multinomial(tmp_path, dtype, shape, sample_shape):
     def rand_check_nd(out):
         return rand_check(out.asnumpy())
     op_export_test('sample_multinomial', M, [x], tmp_path, mx_map=rand_check_nd, onnx_map=rand_check)
+
+
+@pytest.mark.parametrize("dtype", ['float32', 'int32', 'int64'])
+@pytest.mark.parametrize('params', [((2, 4, 6), (1, ), 0, True),
+                                    ((4, 5, 6), (2, 4), 1, False),
+                                    ((4, 5, 6, 7), (0, 2, 4), 2, False),
+                                    ((4, 5, 6, 7), 3, -2, False),
+                                    ((2, 6, 8), 8, -1, True)])
+def test_onnx_export_split_v2(tmp_path, dtype, params):
+    from onnx.defs import onnx_opset_version
+    if onnx_opset_version() < 13 and not isinstance(params[1], int):
+        # opset12 only supports sections. indices is supported since opset13
+        return
+    M = def_model('split_v2', indices_or_sections=params[1], axis=params[2], squeeze_axis=params[3])
+    x = mx.nd.random.uniform(0, 10, params[0]).astype(dtype)
+    op_export_test('split_v2', M, [x], tmp_path)
